@@ -39,7 +39,7 @@ class ApiSportsClient:
     async def get_league_seasons(self, league_id: int = 135) -> list[int]:
         """
         Ritorna le stagioni disponibili per la league (es. Serie A).
-        Chiama GET /leagues?id={league_id} e estrae gli anni dalle stagioni.
+        Chiama GET /leagues?id={league_id}; estrae response[0]["seasons"] e gli anni.
         """
         async with httpx.AsyncClient(timeout=15.0) as client:
             r = await client.get(
@@ -50,18 +50,25 @@ class ApiSportsClient:
             r.raise_for_status()
             data = r.json()
         response = data.get("response", [])
+        if not response:
+            logger.warning("get_league_seasons league_id=%s: response vuota", league_id)
+            return []
+
+        first = response[0]
+        seasons = first.get("seasons", [])
+        if not seasons and "league" in first:
+            league_obj = first["league"]
+            seasons = league_obj.get("seasons", [])
+
         years: list[int] = []
-        for item in response:
-            league_obj = item.get("league") or item
-            seasons = league_obj.get("seasons") or []
-            for s in seasons:
-                if isinstance(s, dict) and "year" in s:
-                    try:
-                        years.append(int(s["year"]))
-                    except (TypeError, ValueError):
-                        pass
-                elif isinstance(s, int):
-                    years.append(s)
+        for s in seasons:
+            if isinstance(s, dict) and "year" in s:
+                try:
+                    years.append(int(s["year"]))
+                except (TypeError, ValueError):
+                    pass
+            elif isinstance(s, int):
+                years.append(s)
         years = sorted(set(years), reverse=True)
         logger.info("get_league_seasons league_id=%s -> %s", league_id, years)
         return years

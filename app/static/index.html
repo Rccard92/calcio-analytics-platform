@@ -142,6 +142,9 @@
     }
     .select-season:focus { outline: none; border-color: #4a7c59; }
     .season-label { color: #8af; font-weight: 500; }
+    .seasons-badge { margin-left: 8px; font-size: 0.75rem; font-weight: 600; }
+    .seasons-badge.ok { color: #6ee7a0; }
+    .seasons-badge.err { color: #f08a8a; }
   </style>
 </head>
 <body>
@@ -150,7 +153,7 @@
     <p class="sub">Un job per stagione — nessuna esecuzione concorrente</p>
 
     <div class="select-wrap">
-      <label for="seasonSelect">Stagione</label>
+      <label for="seasonSelect">Stagione <span id="seasonsBadge" class="seasons-badge"></span></label>
       <select id="seasonSelect" class="select-season" aria-label="Seleziona stagione">
         <option value="">Caricamento…</option>
       </select>
@@ -220,6 +223,7 @@
     const seasonSelect = document.getElementById('seasonSelect');
     const seasonSelected = document.getElementById('seasonSelected');
     const seasonSelectedRow = document.getElementById('seasonSelectedRow');
+    const seasonsBadge = document.getElementById('seasonsBadge');
     const btnApiTest = document.getElementById('btnApiTest');
     const apiResult = document.getElementById('apiResult');
     const apiBadge = document.getElementById('apiBadge');
@@ -237,16 +241,28 @@
     }
 
     async function loadSeasons() {
+      seasonsBadge.textContent = '';
+      seasonsBadge.className = 'seasons-badge';
       try {
-        const r = await fetch(API_BASE + '/ingestion/seasons');
-        if (!r.ok) throw new Error('Errore caricamento stagioni');
-        const data = await r.json();
+        const r = await fetch(API_BASE + '/leagues/seasons');
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const msg = data.detail || r.statusText || 'Errore caricamento stagioni';
+          seasonsBadge.textContent = 'Errore';
+          seasonsBadge.className = 'seasons-badge err';
+          seasonSelect.innerHTML = '<option value="">Errore: ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)) + '</option>';
+          return;
+        }
         availableSeasons = data.seasons || [];
         seasonSelect.innerHTML = '';
         if (availableSeasons.length === 0) {
+          seasonsBadge.textContent = 'Nessuna';
+          seasonsBadge.className = 'seasons-badge err';
           seasonSelect.innerHTML = '<option value="">Nessuna stagione disponibile</option>';
           return;
         }
+        seasonsBadge.textContent = 'OK';
+        seasonsBadge.className = 'seasons-badge ok';
         const latest = availableSeasons[0];
         availableSeasons.forEach(function(year) {
           const opt = document.createElement('option');
@@ -258,7 +274,9 @@
         updateSeasonLabel();
       } catch (e) {
         console.error('loadSeasons', e);
-        seasonSelect.innerHTML = '<option value="">Errore caricamento stagioni</option>';
+        seasonsBadge.textContent = 'Errore';
+        seasonsBadge.className = 'seasons-badge err';
+        seasonSelect.innerHTML = '<option value="">Errore caricamento stagioni (rete/config)</option>';
       }
     }
 
