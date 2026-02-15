@@ -104,6 +104,25 @@
     }
     .error-box.visible { display: block; animation: fadeIn 0.3s ease; }
     .job-id { font-family: monospace; color: #8af; }
+    .btn-secondary {
+      background: #2a2a3d;
+      border: 1px solid #3d3d55;
+      margin-top: 8px;
+    }
+    .btn-secondary:hover { background: #333348; }
+    .api-card {
+      margin-top: 24px;
+      padding: 20px;
+      background: #1e1e28;
+      border-radius: 16px;
+      border: 1px solid #2a2a36;
+    }
+    .api-card h2 { font-size: 1rem; margin: 0 0 12px 0; color: #aaa; font-weight: 500; }
+    .api-result { display: none; }
+    .api-result.visible { display: block; animation: fadeIn 0.3s ease; }
+    .api-result .row { margin-bottom: 8px; }
+    .badge-ok { background: #1a3329; color: #6ee7a0; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+    .badge-err { background: #3d2525; color: #f08a8a; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -131,6 +150,25 @@
     <button id="btnStart" class="btn" type="button">Avvia stagione 2026</button>
 
     <div id="errorBox" class="error-box"></div>
+
+    <div class="api-card">
+      <h2>Connessione API-Sports</h2>
+      <button id="btnApiTest" class="btn btn-secondary" type="button">Test connessione API</button>
+      <div id="apiResult" class="api-result">
+        <div class="row">
+          <span class="label">Stato</span>
+          <span id="apiBadge" class="badge-ok">—</span>
+        </div>
+        <div class="row">
+          <span class="label">Richieste rimanenti</span>
+          <span id="apiRemaining">—</span>
+        </div>
+        <div class="row">
+          <span class="label">Rate limit (/min)</span>
+          <span id="apiLimit">—</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -148,6 +186,11 @@
     const pctRow = document.getElementById('pctRow');
     const btnStart = document.getElementById('btnStart');
     const errorBox = document.getElementById('errorBox');
+    const btnApiTest = document.getElementById('btnApiTest');
+    const apiResult = document.getElementById('apiResult');
+    const apiBadge = document.getElementById('apiBadge');
+    const apiRemaining = document.getElementById('apiRemaining');
+    const apiLimit = document.getElementById('apiLimit');
 
     function setStatus(data) {
       const status = (data && data.status) || 'none';
@@ -226,6 +269,41 @@
         errorBox.classList.add('visible');
         btnStart.disabled = false;
       }
+    });
+
+    btnApiTest.addEventListener('click', async () => {
+      btnApiTest.disabled = true;
+      apiResult.classList.remove('visible');
+      try {
+        const r = await fetch(API_BASE + '/api/test');
+        const data = await r.json().catch(() => ({}));
+        apiResult.classList.add('visible');
+        if (r.ok && data && !data.detail) {
+          const ok = data.ok === true;
+          apiBadge.textContent = ok ? 'OK' : 'Errore';
+          apiBadge.className = ok ? 'badge-ok' : 'badge-err';
+          apiRemaining.textContent = data.remaining_requests != null ? String(data.remaining_requests) : '—';
+          apiLimit.textContent = data.rate_limit_per_minute != null ? String(data.rate_limit_per_minute) : '—';
+        } else {
+          const err = data.detail?.error || data.detail || data.message || 'Errore di connessione';
+          apiBadge.textContent = 'Errore';
+          apiBadge.className = 'badge-err';
+          apiRemaining.textContent = '—';
+          apiLimit.textContent = '—';
+          if (typeof err === 'string') errorBox.textContent = err;
+          else errorBox.textContent = JSON.stringify(err);
+          errorBox.classList.add('visible');
+        }
+      } catch (e) {
+        apiResult.classList.add('visible');
+        apiBadge.textContent = 'Errore';
+        apiBadge.className = 'badge-err';
+        apiRemaining.textContent = '—';
+        apiLimit.textContent = '—';
+        errorBox.textContent = e.message || 'Errore di rete';
+        errorBox.classList.add('visible');
+      }
+      btnApiTest.disabled = false;
     });
   </script>
 </body>
