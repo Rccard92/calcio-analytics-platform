@@ -3,9 +3,9 @@
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.core.database import init_db
 from app.routers import api_test_router, db_status_router, debug_router, dashboard_router, health_router, ingestion_router, leagues_router
@@ -24,13 +24,38 @@ app.include_router(api_test_router)
 app.include_router(debug_router)
 app.include_router(dashboard_router)
 
+templates_dir = Path(__file__).parent / "templates"
+templates = Jinja2Templates(directory=str(templates_dir))
+
+
+@app.get("/", include_in_schema=False)
+def index(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+
+@app.get("/ingestion", include_in_schema=False)
+def page_ingestion(request: Request):
+    return templates.TemplateResponse("ingestion.html", {"request": request})
+
+
+@app.get("/overview", include_in_schema=False)
+def page_overview(request: Request):
+    return templates.TemplateResponse("overview.html", {"request": request})
+
+
+@app.get("/api-status", include_in_schema=False)
+def page_api_status(request: Request):
+    return templates.TemplateResponse("api_status.html", {"request": request})
+
+
+@app.get("/debug", include_in_schema=False)
+def page_debug(request: Request):
+    return templates.TemplateResponse("debug.html", {"request": request})
+
+
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir), html=True), name="static")
-
-    @app.get("/", include_in_schema=False)
-    def _redirect_dashboard():
-        return RedirectResponse(url="/static/")
 
 
 @app.on_event("startup")

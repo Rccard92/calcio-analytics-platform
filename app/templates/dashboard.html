@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+{% block title %}Calcio Analytics — Dashboard{% endblock %}
+{% block extra_css %}
+<style>
+  .card {
+    background: #22222e;
+    border-radius: 20px;
+    padding: 32px;
+    width: 100%;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    animation: fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card h1 { margin: 0 0 8px 0; font-size: 1.5rem; font-weight: 600; }
+  .sub { color: #888; font-size: 0.9rem; margin-bottom: 24px; }
+  .status-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .status-badge.pending { background: #3d3d50; color: #aaa; }
+  .status-badge.running { background: #3d4a1f; color: #b8e086; }
+  .status-badge.completed { background: #1a3329; color: #6ee7a0; }
+  .status-badge.failed { background: #3d2525; color: #f08a8a; }
+  .status-badge.none { background: #2a2a36; color: #888; }
+  .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 0.95rem; }
+  .row .label { color: #888; }
+  .progress-wrap {
+    height: 12px;
+    background: #2a2a36;
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 16px 0 24px 0;
+  }
+  .progress-bar { height: 100%; background: linear-gradient(90deg, #4a7c59, #6ee7a0); border-radius: 999px; width: 0%; transition: width 0.5s ease; }
+  .btn {
+    width: 100%;
+    padding: 14px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    background: #3d5a3d;
+    color: #e2e2e8;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn:hover { background: #4a6e4a; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .error-box {
+    margin-top: 20px;
+    padding: 16px;
+    background: #2a2020;
+    border-radius: 12px;
+    border-left: 4px solid #c55;
+    font-size: 0.9rem;
+    color: #f08a8a;
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: none;
+  }
+  .error-box.visible { display: block; animation: fadeIn 0.3s ease; }
+  .job-id { font-family: monospace; color: #8af; }
+  .btn-secondary { background: #2a2a3d; border: 1px solid #3d3d55; margin-top: 8px; }
+  .btn-secondary:hover { background: #333348; }
+  .api-card { margin-top: 24px; padding: 20px; background: #1e1e28; border-radius: 16px; border: 1px solid #2a2a36; }
+  .api-card h2 { font-size: 1rem; margin: 0 0 12px 0; color: #aaa; font-weight: 500; }
+  .api-result { display: none; }
+  .api-result.visible { display: block; animation: fadeIn 0.3s ease; }
+  .api-result .row { margin-bottom: 8px; }
+  .badge-ok { background: #1a3329; color: #6ee7a0; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+  .badge-err { background: #3d2525; color: #f08a8a; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+  .select-wrap { margin-bottom: 20px; }
+  .select-wrap label { display: block; color: #888; font-size: 0.9rem; margin-bottom: 8px; }
+  .select-season {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 1rem;
+    border-radius: 12px;
+    border: 1px solid #3d3d55;
+    background: #1e1e28;
+    color: #e2e2e8;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 40px;
+  }
+  .select-season:focus { outline: none; border-color: #4a7c59; }
+  .season-label { color: #8af; font-weight: 500; }
+  .seasons-badge { margin-left: 8px; font-size: 0.75rem; font-weight: 600; }
+  .seasons-badge.ok { color: #6ee7a0; }
+  .seasons-badge.err { color: #f08a8a; }
+  .overview-card { margin-top: 24px; padding: 20px; background: #1e1e28; border-radius: 16px; border: 1px solid #2a2a36; }
+  .overview-card h2 { font-size: 1rem; margin: 0 0 16px 0; color: #aaa; font-weight: 500; }
+  .overview-card .row { margin-bottom: 10px; }
+  .overview-coverage-wrap { height: 14px; background: #2a2a36; border-radius: 999px; overflow: hidden; margin: 12px 0 16px 0; }
+  .overview-coverage-bar { height: 100%; border-radius: 999px; width: 0%; transition: width 0.5s ease; }
+  .overview-coverage-bar.green { background: linear-gradient(90deg, #2d5a3d, #6ee7a0); }
+  .overview-coverage-bar.yellow { background: linear-gradient(90deg, #5a4a20, #e7c66e); }
+  .overview-coverage-bar.red { background: linear-gradient(90deg, #5a2d2d, #e7a0a0); }
+  .spinner { width: 24px; height: 24px; border: 3px solid #2a2a36; border-top-color: #6ee7a0; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .overview-loading { display: flex; align-items: center; gap: 12px; color: #888; font-size: 0.9rem; }
+  .overview-content { display: none; }
+  .overview-content.visible { display: block; animation: fadeIn 0.3s ease; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h1>Ingestion Serie A</h1>
+  <p class="sub">Un job per stagione — nessuna esecuzione concorrente</p>
+
+  <div class="select-wrap">
+    <label for="seasonSelect">Stagione <span id="seasonsBadge" class="seasons-badge"></span></label>
+    <select id="seasonSelect" class="select-season" aria-label="Seleziona stagione">
+      <option value="">Caricamento…</option>
+    </select>
+  </div>
+  <div id="seasonSelectedRow" class="row" style="display: none;">
+    <span class="label">Stagione selezionata</span>
+    <span id="seasonSelected" class="season-label">—</span>
+  </div>
+
+  <div id="badge" class="status-badge none">Nessun job</div>
+  <div id="jobIdRow" class="row" style="display: none;">
+    <span class="label">Job ID</span>
+    <span id="jobId" class="job-id">—</span>
+  </div>
+  <div id="progressRow" class="row" style="display: none;">
+    <span class="label">Avanzamento</span>
+    <span id="counts">0 / 0</span>
+  </div>
+  <div class="progress-wrap">
+    <div id="progressBar" class="progress-bar"></div>
+  </div>
+  <div id="pctRow" class="row" style="display: none;">
+    <span class="label">Percentuale</span>
+    <span id="pct">0%</span>
+  </div>
+
+  <button id="btnStart" class="btn" type="button">Avvia stagione</button>
+
+  <div id="errorBox" class="error-box"></div>
+
+  <div class="overview-card">
+    <h2>Panoramica stagione</h2>
+    <div id="overviewLoading" class="overview-loading">
+      <div class="spinner"></div>
+      <span>Caricamento…</span>
+    </div>
+    <div id="overviewContent" class="overview-content">
+      <div class="row">
+        <span class="label">Fixture totali</span>
+        <span id="overviewFixtures">—</span>
+      </div>
+      <div class="row">
+        <span class="label">Stats attese</span>
+        <span id="overviewExpected">—</span>
+      </div>
+      <div class="row">
+        <span class="label">Stats presenti</span>
+        <span id="overviewActual">—</span>
+      </div>
+      <div class="row">
+        <span class="label">Copertura</span>
+        <span id="overviewPct">—</span>
+      </div>
+      <div class="overview-coverage-wrap">
+        <div id="overviewCoverageBar" class="overview-coverage-bar"></div>
+      </div>
+      <div class="row">
+        <span class="label">Fixture incomplete</span>
+        <span id="overviewIncomplete">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="api-card">
+    <h2>Connessione API-Sports</h2>
+    <button id="btnApiTest" class="btn btn-secondary" type="button">Test connessione API</button>
+    <div id="apiResult" class="api-result">
+      <div class="row">
+        <span class="label">Stato</span>
+        <span id="apiBadge" class="badge-ok">—</span>
+      </div>
+      <div class="row">
+        <span class="label">Richieste rimanenti</span>
+        <span id="apiRemaining">—</span>
+      </div>
+      <div class="row">
+        <span class="label">Rate limit (/min)</span>
+        <span id="apiLimit">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+  const API_BASE = '';
+  let currentJobId = null;
+  let refreshTimer = null;
+  let availableSeasons = [];
+
+  const badge = document.getElementById('badge');
+  const jobIdEl = document.getElementById('jobId');
+  const jobIdRow = document.getElementById('jobIdRow');
+  const countsEl = document.getElementById('counts');
+  const progressRow = document.getElementById('progressRow');
+  const progressBar = document.getElementById('progressBar');
+  const pctEl = document.getElementById('pct');
+  const pctRow = document.getElementById('pctRow');
+  const btnStart = document.getElementById('btnStart');
+  const errorBox = document.getElementById('errorBox');
+  const seasonSelect = document.getElementById('seasonSelect');
+  const seasonSelected = document.getElementById('seasonSelected');
+  const seasonSelectedRow = document.getElementById('seasonSelectedRow');
+  const seasonsBadge = document.getElementById('seasonsBadge');
+  const overviewLoading = document.getElementById('overviewLoading');
+  const overviewContent = document.getElementById('overviewContent');
+  const overviewFixtures = document.getElementById('overviewFixtures');
+  const overviewExpected = document.getElementById('overviewExpected');
+  const overviewActual = document.getElementById('overviewActual');
+  const overviewPct = document.getElementById('overviewPct');
+  const overviewCoverageBar = document.getElementById('overviewCoverageBar');
+  const overviewIncomplete = document.getElementById('overviewIncomplete');
+  const btnApiTest = document.getElementById('btnApiTest');
+  const apiResult = document.getElementById('apiResult');
+  const apiBadge = document.getElementById('apiBadge');
+  const apiRemaining = document.getElementById('apiRemaining');
+  const apiLimit = document.getElementById('apiLimit');
+
+  function updateSeasonLabel() {
+    const v = seasonSelect.value;
+    if (v) { seasonSelected.textContent = v; seasonSelectedRow.style.display = 'flex'; }
+    else { seasonSelectedRow.style.display = 'none'; }
+  }
+
+  async function loadSeasons() {
+    seasonsBadge.textContent = '';
+    seasonsBadge.className = 'seasons-badge';
+    try {
+      const r = await fetch(API_BASE + '/leagues/seasons');
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg = data.detail || r.statusText || 'Errore caricamento stagioni';
+        seasonsBadge.textContent = 'Errore';
+        seasonsBadge.className = 'seasons-badge err';
+        seasonSelect.innerHTML = '<option value="">Errore: ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)) + '</option>';
+        return;
+      }
+      availableSeasons = data.seasons || [];
+      seasonSelect.innerHTML = '';
+      if (availableSeasons.length === 0) {
+        seasonsBadge.textContent = 'Nessuna';
+        seasonsBadge.className = 'seasons-badge err';
+        seasonSelect.innerHTML = '<option value="">Nessuna stagione disponibile</option>';
+        return;
+      }
+      seasonsBadge.textContent = 'OK';
+      seasonsBadge.className = 'seasons-badge ok';
+      const latest = availableSeasons[0];
+      availableSeasons.forEach(function(year) {
+        const opt = document.createElement('option');
+        opt.value = year;
+        opt.textContent = year;
+        if (year === latest) opt.selected = true;
+        seasonSelect.appendChild(opt);
+      });
+      updateSeasonLabel();
+      fetchSeasonOverview();
+    } catch (e) {
+      console.error('loadSeasons', e);
+      seasonsBadge.textContent = 'Errore';
+      seasonsBadge.className = 'seasons-badge err';
+      seasonSelect.innerHTML = '<option value="">Errore caricamento stagioni (rete/config)</option>';
+      overviewLoading.style.display = 'none';
+    }
+  }
+
+  function setStatus(data) {
+    const status = (data && data.status) || 'none';
+    badge.textContent = status;
+    badge.className = 'status-badge ' + status;
+    if (data && data.job_id != null) {
+      currentJobId = data.job_id;
+      jobIdEl.textContent = data.job_id;
+      jobIdRow.style.display = 'flex';
+      const total = data.total_fixtures || 0;
+      const processed = data.processed_fixtures || 0;
+      const pct = (data.progress_percentage != null) ? data.progress_percentage : (total ? (processed / total * 100) : 0);
+      countsEl.textContent = processed + ' / ' + total;
+      progressBar.style.width = pct + '%';
+      pctEl.textContent = pct.toFixed(1) + '%';
+      progressRow.style.display = 'flex';
+      pctRow.style.display = 'flex';
+      if (data.error_message) { errorBox.textContent = data.error_message; errorBox.classList.add('visible'); }
+      else { errorBox.classList.remove('visible'); }
+      btnStart.disabled = status === 'running';
+    } else {
+      progressRow.style.display = 'none';
+      pctRow.style.display = 'none';
+      errorBox.classList.remove('visible');
+      btnStart.disabled = false;
+    }
+  }
+
+  seasonSelect.addEventListener('change', function() { updateSeasonLabel(); fetchSeasonOverview(); });
+
+  async function fetchSeasonOverview() {
+    const season = seasonSelect.value ? parseInt(seasonSelect.value, 10) : null;
+    if (season == null || isNaN(season)) { overviewLoading.style.display = 'none'; overviewContent.classList.remove('visible'); return; }
+    overviewLoading.style.display = 'flex';
+    overviewContent.classList.remove('visible');
+    try {
+      const r = await fetch(API_BASE + '/dashboard/season-overview?season=' + season);
+      const data = await r.json().catch(() => ({}));
+      overviewLoading.style.display = 'none';
+      overviewContent.classList.add('visible');
+      if (!r.ok) {
+        overviewFixtures.textContent = overviewExpected.textContent = overviewActual.textContent = overviewIncomplete.textContent = '—';
+        overviewPct.textContent = 'Errore';
+        overviewCoverageBar.style.width = '0%';
+        overviewCoverageBar.className = 'overview-coverage-bar';
+        return;
+      }
+      overviewFixtures.textContent = data.fixtures_count;
+      overviewExpected.textContent = data.expected_stats;
+      overviewActual.textContent = data.actual_stats;
+      const pct = data.coverage_percentage != null ? data.coverage_percentage : 0;
+      overviewPct.textContent = pct.toFixed(1) + '%';
+      overviewCoverageBar.style.width = Math.min(100, pct) + '%';
+      overviewCoverageBar.className = 'overview-coverage-bar ' + (pct >= 95 ? 'green' : pct >= 70 ? 'yellow' : 'red');
+      overviewIncomplete.textContent = data.fixtures_with_missing_stats != null ? data.fixtures_with_missing_stats : '—';
+    } catch (e) {
+      console.error('fetchSeasonOverview', e);
+      overviewLoading.style.display = 'none';
+      overviewContent.classList.add('visible');
+      overviewFixtures.textContent = overviewExpected.textContent = overviewActual.textContent = overviewPct.textContent = overviewIncomplete.textContent = '—';
+      overviewCoverageBar.style.width = '0%';
+      overviewCoverageBar.className = 'overview-coverage-bar';
+    }
+  }
+
+  async function fetchStatus() {
+    if (!currentJobId) return;
+    try {
+      const r = await fetch(API_BASE + '/ingestion/status/' + currentJobId);
+      if (r.ok) {
+        const data = await r.json();
+        setStatus(data);
+        if (data.status === 'completed' || data.status === 'failed') { clearInterval(refreshTimer); refreshTimer = null; btnStart.disabled = false; }
+      }
+    } catch (e) { console.error('Status fetch error', e); }
+  }
+
+  function startRefresh() { if (refreshTimer) clearInterval(refreshTimer); refreshTimer = setInterval(fetchStatus, 3000); fetchStatus(); }
+
+  btnStart.addEventListener('click', async () => {
+    const season = seasonSelect.value ? parseInt(seasonSelect.value, 10) : null;
+    if (season == null || isNaN(season)) { errorBox.textContent = 'Seleziona una stagione.'; errorBox.classList.add('visible'); return; }
+    btnStart.disabled = true;
+    errorBox.classList.remove('visible');
+    try {
+      const r = await fetch(API_BASE + '/ingestion/start?season=' + season + '&force=false', { method: 'POST' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const msg = typeof data.detail === 'string' ? data.detail : (data.detail?.msg || JSON.stringify(data.detail) || r.statusText);
+        errorBox.textContent = msg || 'Errore avvio';
+        errorBox.classList.add('visible');
+        btnStart.disabled = false;
+        return;
+      }
+      currentJobId = data.job_id;
+      setStatus({ job_id: data.job_id, season: data.season, status: 'running', total_fixtures: 0, processed_fixtures: 0, progress_percentage: 0 });
+      startRefresh();
+    } catch (e) {
+      console.error(e);
+      errorBox.textContent = e.message || 'Errore di rete';
+      errorBox.classList.add('visible');
+      btnStart.disabled = false;
+    }
+  });
+
+  loadSeasons();
+
+  btnApiTest.addEventListener('click', async () => {
+    btnApiTest.disabled = true;
+    apiResult.classList.remove('visible');
+    try {
+      const r = await fetch(API_BASE + '/api/test');
+      const data = await r.json().catch(() => ({}));
+      apiResult.classList.add('visible');
+      if (r.ok && data && !data.detail) {
+        const ok = data.ok === true;
+        apiBadge.textContent = ok ? 'OK' : 'Errore';
+        apiBadge.className = ok ? 'badge-ok' : 'badge-err';
+        apiRemaining.textContent = data.remaining_requests != null ? String(data.remaining_requests) : '—';
+        apiLimit.textContent = data.rate_limit_per_minute != null ? String(data.rate_limit_per_minute) : '—';
+      } else {
+        const err = data.detail?.error || data.detail || data.message || 'Errore di connessione';
+        apiBadge.textContent = 'Errore';
+        apiBadge.className = 'badge-err';
+        apiRemaining.textContent = apiLimit.textContent = '—';
+        if (typeof err === 'string') errorBox.textContent = err; else errorBox.textContent = JSON.stringify(err);
+        errorBox.classList.add('visible');
+      }
+    } catch (e) {
+      apiResult.classList.add('visible');
+      apiBadge.textContent = 'Errore';
+      apiBadge.className = 'badge-err';
+      apiRemaining.textContent = apiLimit.textContent = '—';
+      errorBox.textContent = e.message || 'Errore di rete';
+      errorBox.classList.add('visible');
+    }
+    btnApiTest.disabled = false;
+  });
+</script>
+{% endblock %}
