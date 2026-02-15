@@ -60,9 +60,12 @@ def page_teams(request: Request):
 
 
 @app.get("/teams/{team_id}", include_in_schema=False)
-def page_team_detail(request: Request, team_id: int):
-    """Placeholder per Step 2: dettaglio squadra."""
-    return templates.TemplateResponse("team_detail_placeholder.html", {"request": request, "team_id": team_id})
+def page_team_detail(request: Request, team_id: int, season: int = 2024):
+    """Dettaglio squadra: overview, casa/trasferta, form ultime 5, rosa."""
+    return templates.TemplateResponse(
+        "team_detail.html",
+        {"request": request, "team_id": team_id, "season": season},
+    )
 
 
 static_dir = Path(__file__).parent / "static"

@@ -34,6 +34,8 @@ def init_db() -> None:
         fixture,
         ingestion_job,
         league,
+        player,
+        player_season_stats,
         team,
         team_match_stats,
     )
