@@ -129,7 +129,9 @@
     font-size: 0.9rem;
   }
   .incomplete-fixture-row:last-child { border-bottom: none; }
+  .incomplete-fixture-row .match-col { display: flex; flex-direction: column; gap: 2px; }
   .incomplete-fixture-row .match { color: #e2e2e8; }
+  .incomplete-fixture-row .fixture-id { color: #6a6a7a; font-size: 0.75rem; }
   .incomplete-fixture-row .meta { color: #888; font-size: 0.85rem; }
   .incomplete-fixture-row .stats-badge { background: #3d2525; color: #f08a8a; padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; }
   .incomplete-fixture-row .row-right { display: flex; align-items: center; gap: 10px; }
@@ -392,7 +394,7 @@
         incompleteList.innerHTML = list.map(function(f) {
           var dateStr = f.date ? (f.date.slice(0, 10) || f.date) : '—';
           var fid = f.fixture_id != null ? f.fixture_id : '';
-          return '<div class="incomplete-fixture-row"><span class="match">' + (f.home_team || '—') + ' vs ' + (f.away_team || '—') + '</span><span class="row-right"><span class="meta">' + dateStr + ' · <span class="stats-badge">' + (f.stats_count != null ? f.stats_count : 0) + ' stats</span></span><button type="button" class="repair-btn" data-id="' + fid + '">Ripara</button></span></div>';
+          return '<div class="incomplete-fixture-row"><div class="match-col"><span class="match">' + (f.home_team || '—') + ' vs ' + (f.away_team || '—') + '</span><span class="fixture-id">ID: ' + fid + '</span></div><span class="row-right"><span class="meta">' + dateStr + ' · <span class="stats-badge">' + (f.stats_count != null ? f.stats_count : 0) + ' stats</span></span><button type="button" class="repair-btn" data-id="' + fid + '">Ripara</button></span></div>';
         }).join('');
       } else {
         incompleteBox.style.display = 'none';
