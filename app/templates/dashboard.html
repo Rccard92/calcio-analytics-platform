@@ -112,6 +112,26 @@
   .overview-loading { display: flex; align-items: center; gap: 12px; color: #888; font-size: 0.9rem; }
   .overview-content { display: none; }
   .overview-content.visible { display: block; animation: fadeIn 0.3s ease; }
+  .incomplete-box {
+    margin-top: 20px;
+    padding: 16px;
+    background: #251e1e;
+    border-radius: 12px;
+    border: 1px solid #3d2a2a;
+  }
+  .incomplete-box h3 { font-size: 0.95rem; margin: 0 0 12px 0; color: #e7a0a0; font-weight: 600; }
+  .incomplete-fixture-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #2a2222;
+    font-size: 0.9rem;
+  }
+  .incomplete-fixture-row:last-child { border-bottom: none; }
+  .incomplete-fixture-row .match { color: #e2e2e8; }
+  .incomplete-fixture-row .meta { color: #888; font-size: 0.85rem; }
+  .incomplete-fixture-row .stats-badge { background: #3d2525; color: #f08a8a; padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; }
 </style>
 {% endblock %}
 
@@ -182,6 +202,10 @@
         <span class="label">Fixture incomplete</span>
         <span id="overviewIncomplete">—</span>
       </div>
+      <div id="incompleteBox" class="incomplete-box" style="display: none;">
+        <h3>Fixture incomplete</h3>
+        <div id="incompleteList"></div>
+      </div>
     </div>
   </div>
 
@@ -235,6 +259,8 @@
   const overviewPct = document.getElementById('overviewPct');
   const overviewCoverageBar = document.getElementById('overviewCoverageBar');
   const overviewIncomplete = document.getElementById('overviewIncomplete');
+  const incompleteBox = document.getElementById('incompleteBox');
+  const incompleteList = document.getElementById('incompleteList');
   const btnApiTest = document.getElementById('btnApiTest');
   const apiResult = document.getElementById('apiResult');
   const apiBadge = document.getElementById('apiBadge');
@@ -333,6 +359,8 @@
         overviewPct.textContent = 'Errore';
         overviewCoverageBar.style.width = '0%';
         overviewCoverageBar.className = 'overview-coverage-bar';
+        incompleteBox.style.display = 'none';
+        incompleteList.innerHTML = '';
         return;
       }
       overviewFixtures.textContent = data.fixtures_count;
@@ -343,6 +371,17 @@
       overviewCoverageBar.style.width = Math.min(100, pct) + '%';
       overviewCoverageBar.className = 'overview-coverage-bar ' + (pct >= 95 ? 'green' : pct >= 70 ? 'yellow' : 'red');
       overviewIncomplete.textContent = data.fixtures_with_missing_stats != null ? data.fixtures_with_missing_stats : '—';
+      var list = data.incomplete_fixtures || [];
+      if (list.length > 0) {
+        incompleteBox.style.display = 'block';
+        incompleteList.innerHTML = list.map(function(f) {
+          var dateStr = f.date ? (f.date.slice(0, 10) || f.date) : '—';
+          return '<div class="incomplete-fixture-row"><span class="match">' + (f.home_team || '—') + ' vs ' + (f.away_team || '—') + '</span><span class="meta">' + dateStr + ' · <span class="stats-badge">' + (f.stats_count != null ? f.stats_count : 0) + ' stats</span></span></div>';
+        }).join('');
+      } else {
+        incompleteBox.style.display = 'none';
+        incompleteList.innerHTML = '';
+      }
     } catch (e) {
       console.error('fetchSeasonOverview', e);
       overviewLoading.style.display = 'none';
@@ -350,6 +389,8 @@
       overviewFixtures.textContent = overviewExpected.textContent = overviewActual.textContent = overviewPct.textContent = overviewIncomplete.textContent = '—';
       overviewCoverageBar.style.width = '0%';
       overviewCoverageBar.className = 'overview-coverage-bar';
+      incompleteBox.style.display = 'none';
+      incompleteList.innerHTML = '';
     }
   }
 
