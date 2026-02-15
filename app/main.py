@@ -8,7 +8,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.database import init_db
-from app.routers import api_test_router, db_status_router, debug_router, health_router, ingestion_router, leagues_router
+from app.routers import api_test_router, db_status_router, debug_router, dashboard_router, health_router, ingestion_router, leagues_router
 
 app = FastAPI(
     title="Calcio Analytics Platform",
@@ -22,6 +22,7 @@ app.include_router(ingestion_router)
 app.include_router(leagues_router)
 app.include_router(api_test_router)
 app.include_router(debug_router)
+app.include_router(dashboard_router)
 
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():

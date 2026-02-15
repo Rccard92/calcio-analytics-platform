@@ -145,6 +145,43 @@
     .seasons-badge { margin-left: 8px; font-size: 0.75rem; font-weight: 600; }
     .seasons-badge.ok { color: #6ee7a0; }
     .seasons-badge.err { color: #f08a8a; }
+    .overview-card {
+      margin-top: 24px;
+      padding: 20px;
+      background: #1e1e28;
+      border-radius: 16px;
+      border: 1px solid #2a2a36;
+    }
+    .overview-card h2 { font-size: 1rem; margin: 0 0 16px 0; color: #aaa; font-weight: 500; }
+    .overview-card .row { margin-bottom: 10px; }
+    .overview-coverage-wrap {
+      height: 14px;
+      background: #2a2a36;
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 12px 0 16px 0;
+    }
+    .overview-coverage-bar {
+      height: 100%;
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+    .overview-coverage-bar.green { background: linear-gradient(90deg, #2d5a3d, #6ee7a0); }
+    .overview-coverage-bar.yellow { background: linear-gradient(90deg, #5a4a20, #e7c66e); }
+    .overview-coverage-bar.red { background: linear-gradient(90deg, #5a2d2d, #e7a0a0); }
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid #2a2a36;
+      border-top-color: #6ee7a0;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .overview-loading { display: flex; align-items: center; gap: 12px; color: #888; font-size: 0.9rem; }
+    .overview-content { display: none; }
+    .overview-content.visible { display: block; animation: fadeIn 0.3s ease; }
   </style>
 </head>
 <body>
@@ -183,6 +220,39 @@
     <button id="btnStart" class="btn" type="button">Avvia stagione</button>
 
     <div id="errorBox" class="error-box"></div>
+
+    <div class="overview-card">
+      <h2>Panoramica stagione</h2>
+      <div id="overviewLoading" class="overview-loading">
+        <div class="spinner"></div>
+        <span>Caricamento…</span>
+      </div>
+      <div id="overviewContent" class="overview-content">
+        <div class="row">
+          <span class="label">Fixture totali</span>
+          <span id="overviewFixtures">—</span>
+        </div>
+        <div class="row">
+          <span class="label">Stats attese</span>
+          <span id="overviewExpected">—</span>
+        </div>
+        <div class="row">
+          <span class="label">Stats presenti</span>
+          <span id="overviewActual">—</span>
+        </div>
+        <div class="row">
+          <span class="label">Copertura</span>
+          <span id="overviewPct">—</span>
+        </div>
+        <div class="overview-coverage-wrap">
+          <div id="overviewCoverageBar" class="overview-coverage-bar"></div>
+        </div>
+        <div class="row">
+          <span class="label">Fixture incomplete</span>
+          <span id="overviewIncomplete">—</span>
+        </div>
+      </div>
+    </div>
 
     <div class="api-card">
       <h2>Connessione API-Sports</h2>
@@ -224,6 +294,14 @@
     const seasonSelected = document.getElementById('seasonSelected');
     const seasonSelectedRow = document.getElementById('seasonSelectedRow');
     const seasonsBadge = document.getElementById('seasonsBadge');
+    const overviewLoading = document.getElementById('overviewLoading');
+    const overviewContent = document.getElementById('overviewContent');
+    const overviewFixtures = document.getElementById('overviewFixtures');
+    const overviewExpected = document.getElementById('overviewExpected');
+    const overviewActual = document.getElementById('overviewActual');
+    const overviewPct = document.getElementById('overviewPct');
+    const overviewCoverageBar = document.getElementById('overviewCoverageBar');
+    const overviewIncomplete = document.getElementById('overviewIncomplete');
     const btnApiTest = document.getElementById('btnApiTest');
     const apiResult = document.getElementById('apiResult');
     const apiBadge = document.getElementById('apiBadge');
@@ -272,11 +350,13 @@
           seasonSelect.appendChild(opt);
         });
         updateSeasonLabel();
+        fetchSeasonOverview();
       } catch (e) {
         console.error('loadSeasons', e);
         seasonsBadge.textContent = 'Errore';
         seasonsBadge.className = 'seasons-badge err';
         seasonSelect.innerHTML = '<option value="">Errore caricamento stagioni (rete/config)</option>';
+        overviewLoading.style.display = 'none';
       }
     }
 
@@ -311,7 +391,56 @@
       }
     }
 
-    seasonSelect.addEventListener('change', updateSeasonLabel);
+    seasonSelect.addEventListener('change', function() {
+      updateSeasonLabel();
+      fetchSeasonOverview();
+    });
+
+    async function fetchSeasonOverview() {
+      const season = seasonSelect.value ? parseInt(seasonSelect.value, 10) : null;
+      if (season == null || isNaN(season)) {
+        overviewLoading.style.display = 'none';
+        overviewContent.classList.remove('visible');
+        return;
+      }
+      overviewLoading.style.display = 'flex';
+      overviewContent.classList.remove('visible');
+      try {
+        const r = await fetch(API_BASE + '/dashboard/season-overview?season=' + season);
+        const data = await r.json().catch(() => ({}));
+        overviewLoading.style.display = 'none';
+        overviewContent.classList.add('visible');
+        if (!r.ok) {
+          overviewFixtures.textContent = '—';
+          overviewExpected.textContent = '—';
+          overviewActual.textContent = '—';
+          overviewPct.textContent = 'Errore';
+          overviewCoverageBar.style.width = '0%';
+          overviewCoverageBar.className = 'overview-coverage-bar';
+          overviewIncomplete.textContent = '—';
+          return;
+        }
+        overviewFixtures.textContent = data.fixtures_count;
+        overviewExpected.textContent = data.expected_stats;
+        overviewActual.textContent = data.actual_stats;
+        const pct = data.coverage_percentage != null ? data.coverage_percentage : 0;
+        overviewPct.textContent = pct.toFixed(1) + '%';
+        overviewCoverageBar.style.width = Math.min(100, pct) + '%';
+        overviewCoverageBar.className = 'overview-coverage-bar ' + (pct >= 95 ? 'green' : pct >= 70 ? 'yellow' : 'red');
+        overviewIncomplete.textContent = data.fixtures_with_missing_stats != null ? data.fixtures_with_missing_stats : '—';
+      } catch (e) {
+        console.error('fetchSeasonOverview', e);
+        overviewLoading.style.display = 'none';
+        overviewContent.classList.add('visible');
+        overviewFixtures.textContent = '—';
+        overviewExpected.textContent = '—';
+        overviewActual.textContent = '—';
+        overviewPct.textContent = '—';
+        overviewCoverageBar.style.width = '0%';
+        overviewCoverageBar.className = 'overview-coverage-bar';
+        overviewIncomplete.textContent = '—';
+      }
+    }
 
     async function fetchStatus() {
       if (!currentJobId) return;
