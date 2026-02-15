@@ -67,7 +67,7 @@
         .equal {
             background: #4CAF50;
             color: white;
-            grid-column: span 2;
+            grid-row: span 2;
         }
 
         .clear {
@@ -87,23 +87,24 @@
 
     <div class="buttons">
         <button class="clear" onclick="clearDisplay()">C</button>
+        <button class="operator" onclick="append('%')">%</button>
         <button class="operator" onclick="append('/')">÷</button>
         <button class="operator" onclick="append('*')">×</button>
-        <button class="operator" onclick="append('-')">−</button>
 
         <button class="number" onclick="append('7')">7</button>
         <button class="number" onclick="append('8')">8</button>
         <button class="number" onclick="append('9')">9</button>
-        <button class="operator" onclick="append('+')">+</button>
+        <button class="operator" onclick="append('-')">−</button>
 
         <button class="number" onclick="append('4')">4</button>
         <button class="number" onclick="append('5')">5</button>
         <button class="number" onclick="append('6')">6</button>
-        <button class="equal" onclick="calculate()">=</button>
+        <button class="operator" onclick="append('+')">+</button>
 
         <button class="number" onclick="append('1')">1</button>
         <button class="number" onclick="append('2')">2</button>
         <button class="number" onclick="append('3')">3</button>
+        <button class="equal" onclick="calculate()">=</button>
 
         <button class="number zero" onclick="append('0')">0</button>
         <button class="number" onclick="append('.')">.</button>
@@ -117,8 +118,10 @@
 
     function calculate() {
         try {
-            document.getElementById("display").value =
-                eval(document.getElementById("display").value);
+            let expr = document.getElementById("display").value;
+            // Interpreta % come "diviso 100" (es. 50% → 0.5)
+            expr = expr.replace(/(\d+\.?\d*)%/g, '($1/100)');
+            document.getElementById("display").value = eval(expr);
         } catch {
             alert("Errore di calcolo");
         }
