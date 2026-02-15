@@ -10,13 +10,14 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import IngestionJob
+from app.services.api_sports_client import ApiSportsClient
 from app.services.ingestion_service import IngestionService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ingestion", tags=["ingestion"])
 
-DEFAULT_SEASON = 2026
+SERIE_A_LEAGUE_ID = 135
 
 
 async def _run_ingestion_background(job_id: int) -> None:
@@ -28,28 +29,64 @@ async def _run_ingestion_background(job_id: int) -> None:
         logger.exception("Background ingestion job_id=%s errore: %s", job_id, e)
 
 
+@router.get("/seasons")
+async def get_seasons():
+    """
+    Restituisce le stagioni disponibili per la Serie A (league_id=135).
+    Popola la dropdown senza hardcodare gli anni.
+    """
+    try:
+        client = ApiSportsClient()
+        seasons = await client.get_league_seasons(league_id=SERIE_A_LEAGUE_ID)
+        return {"league_id": SERIE_A_LEAGUE_ID, "seasons": seasons}
+    except RuntimeError as e:
+        logger.warning("get_seasons config error: %s", e)
+        raise HTTPException(
+            status_code=503,
+            detail="API non configurata (API_SPORTS_KEY?). Impossibile recuperare le stagioni.",
+        )
+    except Exception as e:
+        logger.exception("get_seasons failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"Errore recupero stagioni: {e}")
+
+
 @router.post("/start")
-def start_ingestion(
-    season: int = DEFAULT_SEASON,
+async def start_ingestion(
+    season: int,
+    force: bool = False,
     background_tasks: BackgroundTasks = None,
 ):
     """
-    Avvia l'ingestion per la stagione in background.
-    Ritorna subito con job_id e status 'started'.
-    Se per la stessa stagione c'è già un job in esecuzione → 409.
+    Avvia l'ingestion per la stagione selezionata.
+    Valida che la stagione sia tra quelle disponibili; un solo job in esecuzione per stagione.
+    Con force=true è possibile riavviare una stagione già completata.
     """
     try:
+        client = ApiSportsClient()
+        available = await client.get_league_seasons(league_id=SERIE_A_LEAGUE_ID)
+        if season not in available:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Stagione {season} non disponibile. Stagioni valide: {available}",
+            )
+    except HTTPException:
+        raise
+    except RuntimeError as e:
+        logger.exception("Start ingestion config: %s", e)
+        raise HTTPException(status_code=503, detail="Ingestion non configurata (API_SPORTS_KEY?)")
+    except Exception as e:
+        logger.exception("Start ingestion pre-check: %s", e)
+        raise HTTPException(status_code=502, detail=f"Errore validazione stagione: {e}")
+
+    try:
         service = IngestionService()
-        job_id = service.start_ingestion(season)
+        job_id = service.start_ingestion(season=season, force=force)
     except ValueError as e:
         logger.warning("Start ingestion rifiutato: %s", e)
         raise HTTPException(status_code=409, detail=str(e))
-    except RuntimeError as e:
-        logger.exception("Config errata per ingestion: %s", e)
-        raise HTTPException(status_code=503, detail="Ingestion non configurata (API_SPORTS_KEY?)")
 
     background_tasks.add_task(_run_ingestion_background, job_id)
-    return {"job_id": job_id, "status": "started"}
+    return {"job_id": job_id, "status": "started", "season": season}
 
 
 @router.get("/status/{job_id}")

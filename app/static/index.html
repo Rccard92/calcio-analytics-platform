@@ -123,12 +123,42 @@
     .api-result .row { margin-bottom: 8px; }
     .badge-ok { background: #1a3329; color: #6ee7a0; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
     .badge-err { background: #3d2525; color: #f08a8a; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+    .select-wrap { margin-bottom: 20px; }
+    .select-wrap label { display: block; color: #888; font-size: 0.9rem; margin-bottom: 8px; }
+    .select-season {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 1rem;
+      border-radius: 12px;
+      border: 1px solid #3d3d55;
+      background: #1e1e28;
+      color: #e2e2e8;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 40px;
+    }
+    .select-season:focus { outline: none; border-color: #4a7c59; }
+    .season-label { color: #8af; font-weight: 500; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Ingestion Serie A</h1>
-    <p class="sub">Stagione 2026 — un job alla volta</p>
+    <p class="sub">Un job per stagione — nessuna esecuzione concorrente</p>
+
+    <div class="select-wrap">
+      <label for="seasonSelect">Stagione</label>
+      <select id="seasonSelect" class="select-season" aria-label="Seleziona stagione">
+        <option value="">Caricamento…</option>
+      </select>
+    </div>
+    <div id="seasonSelectedRow" class="row" style="display: none;">
+      <span class="label">Stagione selezionata</span>
+      <span id="seasonSelected" class="season-label">—</span>
+    </div>
 
     <div id="badge" class="status-badge none">Nessun job</div>
     <div id="jobIdRow" class="row" style="display: none;">
@@ -147,7 +177,7 @@
       <span id="pct">0%</span>
     </div>
 
-    <button id="btnStart" class="btn" type="button">Avvia stagione 2026</button>
+    <button id="btnStart" class="btn" type="button">Avvia stagione</button>
 
     <div id="errorBox" class="error-box"></div>
 
@@ -172,9 +202,10 @@
   </div>
 
   <script>
-    const API_BASE = ''; // same origin
+    const API_BASE = '';
     let currentJobId = null;
     let refreshTimer = null;
+    let availableSeasons = [];
 
     const badge = document.getElementById('badge');
     const jobIdEl = document.getElementById('jobId');
@@ -186,11 +217,50 @@
     const pctRow = document.getElementById('pctRow');
     const btnStart = document.getElementById('btnStart');
     const errorBox = document.getElementById('errorBox');
+    const seasonSelect = document.getElementById('seasonSelect');
+    const seasonSelected = document.getElementById('seasonSelected');
+    const seasonSelectedRow = document.getElementById('seasonSelectedRow');
     const btnApiTest = document.getElementById('btnApiTest');
     const apiResult = document.getElementById('apiResult');
     const apiBadge = document.getElementById('apiBadge');
     const apiRemaining = document.getElementById('apiRemaining');
     const apiLimit = document.getElementById('apiLimit');
+
+    function updateSeasonLabel() {
+      const v = seasonSelect.value;
+      if (v) {
+        seasonSelected.textContent = v;
+        seasonSelectedRow.style.display = 'flex';
+      } else {
+        seasonSelectedRow.style.display = 'none';
+      }
+    }
+
+    async function loadSeasons() {
+      try {
+        const r = await fetch(API_BASE + '/ingestion/seasons');
+        if (!r.ok) throw new Error('Errore caricamento stagioni');
+        const data = await r.json();
+        availableSeasons = data.seasons || [];
+        seasonSelect.innerHTML = '';
+        if (availableSeasons.length === 0) {
+          seasonSelect.innerHTML = '<option value="">Nessuna stagione disponibile</option>';
+          return;
+        }
+        const latest = availableSeasons[0];
+        availableSeasons.forEach(function(year) {
+          const opt = document.createElement('option');
+          opt.value = year;
+          opt.textContent = year;
+          if (year === latest) opt.selected = true;
+          seasonSelect.appendChild(opt);
+        });
+        updateSeasonLabel();
+      } catch (e) {
+        console.error('loadSeasons', e);
+        seasonSelect.innerHTML = '<option value="">Errore caricamento stagioni</option>';
+      }
+    }
 
     function setStatus(data) {
       const status = (data && data.status) || 'none';
@@ -223,6 +293,8 @@
       }
     }
 
+    seasonSelect.addEventListener('change', updateSeasonLabel);
+
     async function fetchStatus() {
       if (!currentJobId) return;
       try {
@@ -248,20 +320,26 @@
     }
 
     btnStart.addEventListener('click', async () => {
+      const season = seasonSelect.value ? parseInt(seasonSelect.value, 10) : null;
+      if (season == null || isNaN(season)) {
+        errorBox.textContent = 'Seleziona una stagione.';
+        errorBox.classList.add('visible');
+        return;
+      }
       btnStart.disabled = true;
       errorBox.classList.remove('visible');
       try {
-        const r = await fetch(API_BASE + '/ingestion/start?season=2026', { method: 'POST' });
+        const r = await fetch(API_BASE + '/ingestion/start?season=' + season + '&force=false', { method: 'POST' });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) {
-          const msg = data.detail || r.statusText || 'Errore avvio';
-          errorBox.textContent = msg;
+          const msg = typeof data.detail === 'string' ? data.detail : (data.detail?.msg || JSON.stringify(data.detail) || r.statusText);
+          errorBox.textContent = msg || 'Errore avvio';
           errorBox.classList.add('visible');
           btnStart.disabled = false;
           return;
         }
         currentJobId = data.job_id;
-        setStatus({ job_id: data.job_id, status: 'running', total_fixtures: 0, processed_fixtures: 0, progress_percentage: 0 });
+        setStatus({ job_id: data.job_id, season: data.season, status: 'running', total_fixtures: 0, processed_fixtures: 0, progress_percentage: 0 });
         startRefresh();
       } catch (e) {
         console.error(e);
@@ -270,6 +348,8 @@
         btnStart.disabled = false;
       }
     });
+
+    loadSeasons();
 
     btnApiTest.addEventListener('click', async () => {
       btnApiTest.disabled = true;

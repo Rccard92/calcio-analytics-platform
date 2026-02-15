@@ -49,10 +49,11 @@ class IngestionService:
     def __init__(self, api_key: str | None = None):
         self._client = ApiSportsClient(api_key=api_key)
 
-    def start_ingestion(self, season: int) -> int:
+    def start_ingestion(self, season: int, force: bool = False) -> int:
         """
         Crea un job in stato pending e ritorna job_id (solo DB, sync).
-        L'elaborazione va avviata in background con process_season(job_id).
+        Se esiste già un job in esecuzione per la stagione → ValueError.
+        Se esiste un job completato per la stagione e force=False → ValueError (usare force=True per riavviare).
         """
         db = SessionLocal()
         try:
@@ -63,6 +64,15 @@ class IngestionService:
             )
             if running:
                 raise ValueError(f"È già in esecuzione un job per la stagione {season} (job_id={running.id})")
+            completed = (
+                db.query(IngestionJob)
+                .filter(IngestionJob.season == season, IngestionJob.status == "completed")
+                .first()
+            )
+            if completed and not force:
+                raise ValueError(
+                    f"Stagione {season} già completata (job_id={completed.id}). Usare force=true per riavviare."
+                )
             job = IngestionJob(season=season, status="pending", total_fixtures=0, processed_fixtures=0)
             db.add(job)
             db.commit()

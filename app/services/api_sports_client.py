@@ -36,6 +36,36 @@ class ApiSportsClient:
     def _headers(self) -> dict[str, str]:
         return {"x-apisports-key": self._api_key}
 
+    async def get_league_seasons(self, league_id: int = 135) -> list[int]:
+        """
+        Ritorna le stagioni disponibili per la league (es. Serie A).
+        Chiama GET /leagues?id={league_id} e estrae gli anni dalle stagioni.
+        """
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.get(
+                f"{BASE_URL}/leagues",
+                params={"id": league_id},
+                headers=self._headers(),
+            )
+            r.raise_for_status()
+            data = r.json()
+        response = data.get("response", [])
+        years: list[int] = []
+        for item in response:
+            league_obj = item.get("league") or item
+            seasons = league_obj.get("seasons") or []
+            for s in seasons:
+                if isinstance(s, dict) and "year" in s:
+                    try:
+                        years.append(int(s["year"]))
+                    except (TypeError, ValueError):
+                        pass
+                elif isinstance(s, int):
+                    years.append(s)
+        years = sorted(set(years), reverse=True)
+        logger.info("get_league_seasons league_id=%s -> %s", league_id, years)
+        return years
+
     async def get_fixtures(self, league: int = 135, season: int = 2026) -> list[dict[str, Any]]:
         """
         Ritorna l'elenco delle fixture per league/season.
