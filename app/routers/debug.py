@@ -10,7 +10,55 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.models import Fixture, Team, TeamMatchStats
 
-router = APIRouter(prefix="/debug", tags=["debug"])
+router = APIRouter(prefix="/debug", tags=["Debug"])
+
+
+@router.get("/raw-stats/{fixture_id}")
+def raw_stats(fixture_id: int, db: Session = Depends(get_db)):
+    """
+    Restituisce fixture e team_match_stats (raw stats) per il fixture_id dato.
+    Utile per debug dopo ingestion/repair.
+    """
+    fixture = (
+        db.query(Fixture)
+        .options(
+            joinedload(Fixture.home_team),
+            joinedload(Fixture.away_team),
+            joinedload(Fixture.team_match_stats).joinedload(TeamMatchStats.team),
+        )
+        .filter(Fixture.id == fixture_id)
+        .first()
+    )
+    if not fixture:
+        raise HTTPException(status_code=404, detail=f"Fixture {fixture_id} non trovata")
+
+    def stat_to_dict(s):
+        return {
+            "team_id": s.team_id,
+            "team_name": s.team.name if s.team else None,
+            "shots_total": s.shots_total,
+            "shots_on_target": s.shots_on_target,
+            "possession": s.possession,
+            "fouls": s.fouls,
+            "corners": s.corners,
+            "yellow_cards": s.yellow_cards,
+            "red_cards": s.red_cards,
+        }
+
+    date_out = fixture.date.isoformat() if fixture.date else None
+    home = fixture.home_team
+    away = fixture.away_team
+    return {
+        "id": fixture.id,
+        "season": fixture.season,
+        "date": date_out,
+        "round": fixture.round,
+        "status": fixture.status,
+        "home_team": {"id": home.id, "name": home.name} if home else None,
+        "away_team": {"id": away.id, "name": away.name} if away else None,
+        "goals": {"home": fixture.home_goals, "away": fixture.away_goals},
+        "team_match_stats": [stat_to_dict(s) for s in fixture.team_match_stats],
+    }
 
 
 @router.get("/db-overview")
