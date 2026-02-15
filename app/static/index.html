@@ -127,7 +127,12 @@
     function calculate() {
         try {
             let expr = document.getElementById("display").value;
-            // Interpreta % come "diviso 100" (es. 50% → 0.5)
+            // Percentuale in contesto: 100+22% = 100 + 22% di 100 = 122
+            expr = expr.replace(/(\d+\.?\d*)\s*\+\s*(\d+\.?\d*)%/g, '($1 * (1 + $2/100))');
+            expr = expr.replace(/(\d+\.?\d*)\s*-\s*(\d+\.?\d*)%/g, '($1 * (1 - $2/100))');
+            expr = expr.replace(/(\d+\.?\d*)\s*\*\s*(\d+\.?\d*)%/g, '($1 * $2/100)');
+            expr = expr.replace(/(\d+\.?\d*)\s*\/\s*(\d+\.?\d*)%/g, '($1 / ($2/100))');
+            // Percentuale da sola: 50% → 0.5
             expr = expr.replace(/(\d+\.?\d*)%/g, '($1/100)');
             document.getElementById("display").value = eval(expr);
             justCalculated = true;
