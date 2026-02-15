@@ -26,8 +26,9 @@ def get_db():
 
 def init_db() -> None:
     """
-    Create all tables. For development only.
-    Do not call in production; use migrations instead.
+    Crea tutte le tabelle (Base.metadata.create_all).
+    I modelli devono essere importati prima per registrare i metadata.
+    Temporaneo per sviluppo; in produzione usare migrazioni.
     """
     from app.models import fixture, league, team, team_match_stats  # noqa: F401
 
