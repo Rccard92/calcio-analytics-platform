@@ -81,6 +81,59 @@ class IngestionService:
         finally:
             db.close()
 
+    async def repair_fixture(self, fixture_id: int) -> dict[str, Any]:
+        """
+        Riparazione chirurgica: cancella stats esistenti per la fixture,
+        richiede statistiche alla API e salva. Non tocca ingestion principale.
+        Ritorna fixture_id, status, stats_saved; se API vuota stats_saved=0.
+        """
+        db = SessionLocal()
+        try:
+            fixture = db.query(Fixture).filter(Fixture.id == fixture_id).first()
+            if not fixture:
+                raise ValueError(f"Fixture {fixture_id} non trovata")
+            deleted = db.query(TeamMatchStats).filter(TeamMatchStats.fixture_id == fixture_id).delete()
+            db.commit()
+            logger.info("repair_fixture fixture_id=%s: eliminate %s stats esistenti", fixture_id, deleted)
+            raw = await self._client.get_fixture_statistics(fixture_id)
+            if not raw:
+                logger.warning("repair_fixture fixture_id=%s: API ha restituito lista vuota", fixture_id)
+                return {
+                    "fixture_id": fixture_id,
+                    "status": "repaired",
+                    "stats_saved": 0,
+                    "message": "API non ha restituito statistiche",
+                }
+            for team_block in raw:
+                team_info = team_block.get("team", {})
+                team_id = team_info.get("id")
+                if not team_id:
+                    continue
+                stats_list = team_block.get("statistics", [])
+                mapped = _map_api_stats_to_model(stats_list)
+                db.add(
+                    TeamMatchStats(
+                        fixture_id=fixture_id,
+                        team_id=team_id,
+                        **mapped,
+                    )
+                )
+            db.commit()
+            saved = len(raw)
+            logger.info("repair_fixture fixture_id=%s: salvate %s stats", fixture_id, saved)
+            return {
+                "fixture_id": fixture_id,
+                "status": "repaired",
+                "stats_saved": saved,
+            }
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.exception("repair_fixture fixture_id=%s errore: %s", fixture_id, e)
+            raise
+        finally:
+            db.close()
+
     def _update_job(
         self,
         db: Session,

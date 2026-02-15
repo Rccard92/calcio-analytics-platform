@@ -132,6 +132,21 @@
   .incomplete-fixture-row .match { color: #e2e2e8; }
   .incomplete-fixture-row .meta { color: #888; font-size: 0.85rem; }
   .incomplete-fixture-row .stats-badge { background: #3d2525; color: #f08a8a; padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; }
+  .incomplete-fixture-row .row-right { display: flex; align-items: center; gap: 10px; }
+  .btn-repair {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    border-radius: 8px;
+    border: 1px solid #3d5a3d;
+    background: #2a3d2a;
+    color: #8ae68a;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-repair:hover:not(:disabled) { background: #3d5a3d; }
+  .btn-repair:disabled { opacity: 0.6; cursor: not-allowed; }
+  .repair-spinner { width: 14px; height: 14px; border: 2px solid #2a2a36; border-top-color: #6ee7a0; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .repair-ok { color: #6ee7a0; font-size: 0.8rem; font-weight: 600; }
 </style>
 {% endblock %}
 
@@ -376,7 +391,8 @@
         incompleteBox.style.display = 'block';
         incompleteList.innerHTML = list.map(function(f) {
           var dateStr = f.date ? (f.date.slice(0, 10) || f.date) : '—';
-          return '<div class="incomplete-fixture-row"><span class="match">' + (f.home_team || '—') + ' vs ' + (f.away_team || '—') + '</span><span class="meta">' + dateStr + ' · <span class="stats-badge">' + (f.stats_count != null ? f.stats_count : 0) + ' stats</span></span></div>';
+          var fid = f.fixture_id != null ? f.fixture_id : '';
+          return '<div class="incomplete-fixture-row"><span class="match">' + (f.home_team || '—') + ' vs ' + (f.away_team || '—') + '</span><span class="row-right"><span class="meta">' + dateStr + ' · <span class="stats-badge">' + (f.stats_count != null ? f.stats_count : 0) + ' stats</span></span><button type="button" class="btn-repair" data-fixture-id="' + fid + '">Ripara</button></span></div>';
         }).join('');
       } else {
         incompleteBox.style.display = 'none';
@@ -435,6 +451,40 @@
   });
 
   loadSeasons();
+
+  incompleteList.addEventListener('click', async function(e) {
+    var btn = e.target.closest('.btn-repair');
+    if (!btn || btn.disabled) return;
+    var fid = btn.getAttribute('data-fixture-id');
+    if (!fid) return;
+    btn.disabled = true;
+    var origText = btn.textContent;
+    btn.innerHTML = '<span class="repair-spinner"></span>';
+    try {
+      var r = await fetch(API_BASE + '/ingestion/repair-fixture/' + fid, { method: 'POST' });
+      var data = await r.json().catch(function() { return {}; });
+      if (r.ok) {
+        if (data.stats_saved > 0) {
+          btn.classList.add('repair-ok');
+          btn.textContent = 'Riparata';
+        } else {
+          btn.textContent = data.message || 'Nessuna stat';
+        }
+        fetchSeasonOverview();
+      } else {
+        btn.disabled = false;
+        btn.textContent = origText;
+        errorBox.textContent = data.detail || r.statusText || 'Errore riparazione';
+        errorBox.classList.add('visible');
+      }
+    } catch (err) {
+      console.error('repair_fixture', err);
+      btn.disabled = false;
+      btn.textContent = origText;
+      errorBox.textContent = err.message || 'Errore di rete';
+      errorBox.classList.add('visible');
+    }
+  });
 
   btnApiTest.addEventListener('click', async () => {
     btnApiTest.disabled = true;

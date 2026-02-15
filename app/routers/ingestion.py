@@ -89,6 +89,27 @@ async def start_ingestion(
     return {"job_id": job_id, "status": "started", "season": season}
 
 
+@router.post("/repair-fixture/{fixture_id}")
+async def repair_fixture(fixture_id: int):
+    """
+    Riparazione chirurgica: elimina stats esistenti per la fixture,
+    richiede statistiche alla API e le salva. Non rifà l'ingestion.
+    """
+    try:
+        service = IngestionService()
+        result = await service.repair_fixture(fixture_id)
+        return result
+    except ValueError as e:
+        logger.warning("repair_fixture %s: %s", fixture_id, e)
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        logger.exception("repair_fixture config: %s", e)
+        raise HTTPException(status_code=503, detail="API non configurata (API_SPORTS_KEY?)")
+    except Exception as e:
+        logger.exception("repair_fixture fixture_id=%s: %s", fixture_id, e)
+        raise HTTPException(status_code=502, detail=f"Errore riparazione: {e}")
+
+
 @router.get("/status/{job_id}")
 def ingestion_status(job_id: int, db: Session = Depends(get_db)):
     """

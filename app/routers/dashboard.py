@@ -47,11 +47,11 @@ def season_overview(season: int, db: Session = Depends(get_db)):
         .count()
     )
 
-    # Fixture con meno di 2 stats (incomplete): solo conteggio
+    # Fixture con meno di 2 stats (incomplete): solo quelle concluse (FT)
     incomplete_count = (
         db.query(Fixture.id)
         .outerjoin(TeamMatchStats, Fixture.id == TeamMatchStats.fixture_id)
-        .filter(Fixture.season == season)
+        .filter(Fixture.season == season, Fixture.status == "FT")
         .group_by(Fixture.id)
         .having(func.count(TeamMatchStats.id) < 2)
         .count()
@@ -72,7 +72,7 @@ def season_overview(season: int, db: Session = Depends(get_db)):
         .join(home_alias, Fixture.home_team_id == home_alias.id)
         .join(away_alias, Fixture.away_team_id == away_alias.id)
         .outerjoin(TeamMatchStats, Fixture.id == TeamMatchStats.fixture_id)
-        .filter(Fixture.season == season)
+        .filter(Fixture.season == season, Fixture.status == "FT")
         .group_by(Fixture.id, Fixture.date, home_alias.name, away_alias.name)
         .having(func.count(TeamMatchStats.id) < 2)
         .order_by(Fixture.date.desc())
