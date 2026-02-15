@@ -1,13 +1,13 @@
-import os
+"""Calcio Analytics Platform — pre-match football analytics API."""
+
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 
-app = FastAPI()
+from app.routers import health_router
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app = FastAPI(
+    title="Calcio Analytics Platform",
+    description="Production football analytics API. Serie A data (fixtures, team match stats).",
+    version="0.1.0",
+)
 
-@app.get("/", response_class=HTMLResponse)
-def read_root():
-    with open("app/static/index.html", "r", encoding="utf-8") as f:
-        return f.read()
+app.include_router(health_router)
