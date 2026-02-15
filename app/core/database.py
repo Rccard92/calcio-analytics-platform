@@ -30,6 +30,12 @@ def init_db() -> None:
     I modelli devono essere importati prima per registrare i metadata.
     Temporaneo per sviluppo; in produzione usare migrazioni.
     """
-    from app.models import fixture, league, team, team_match_stats  # noqa: F401
+    from app.models import (  # noqa: F401
+        fixture,
+        ingestion_job,
+        league,
+        team,
+        team_match_stats,
+    )
 
     Base.metadata.create_all(bind=engine)

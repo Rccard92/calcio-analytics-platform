@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calcio Analytics — Ingestion</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(145deg, #0f0f14 0%, #1a1a24 100%);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #e2e2e8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #22222e;
+      border-radius: 20px;
+      padding: 32px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+      animation: fadeIn 0.4s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    .sub {
+      color: #888;
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .status-badge.pending { background: #3d3d50; color: #aaa; }
+    .status-badge.running { background: #3d4a1f; color: #b8e086; }
+    .status-badge.completed { background: #1a3329; color: #6ee7a0; }
+    .status-badge.failed { background: #3d2525; color: #f08a8a; }
+    .status-badge.none { background: #2a2a36; color: #888; }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+    }
+    .row .label { color: #888; }
+    .progress-wrap {
+      height: 12px;
+      background: #2a2a36;
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 16px 0 24px 0;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #4a7c59, #6ee7a0);
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      background: #3d5a3d;
+      color: #e2e2e8;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:hover { background: #4a6e4a; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error-box {
+      margin-top: 20px;
+      padding: 16px;
+      background: #2a2020;
+      border-radius: 12px;
+      border-left: 4px solid #c55;
+      font-size: 0.9rem;
+      color: #f08a8a;
+      white-space: pre-wrap;
+      word-break: break-word;
+      display: none;
+    }
+    .error-box.visible { display: block; animation: fadeIn 0.3s ease; }
+    .job-id { font-family: monospace; color: #8af; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Ingestion Serie A</h1>
+    <p class="sub">Stagione 2026 — un job alla volta</p>
+
+    <div id="badge" class="status-badge none">Nessun job</div>
+    <div id="jobIdRow" class="row" style="display: none;">
+      <span class="label">Job ID</span>
+      <span id="jobId" class="job-id">—</span>
+    </div>
+    <div id="progressRow" class="row" style="display: none;">
+      <span class="label">Avanzamento</span>
+      <span id="counts">0 / 0</span>
+    </div>
+    <div class="progress-wrap">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+    <div id="pctRow" class="row" style="display: none;">
+      <span class="label">Percentuale</span>
+      <span id="pct">0%</span>
+    </div>
+
+    <button id="btnStart" class="btn" type="button">Avvia stagione 2026</button>
+
+    <div id="errorBox" class="error-box"></div>
+  </div>
+
+  <script>
+    const API_BASE = ''; // same origin
+    let currentJobId = null;
+    let refreshTimer = null;
+
+    const badge = document.getElementById('badge');
+    const jobIdEl = document.getElementById('jobId');
+    const jobIdRow = document.getElementById('jobIdRow');
+    const countsEl = document.getElementById('counts');
+    const progressRow = document.getElementById('progressRow');
+    const progressBar = document.getElementById('progressBar');
+    const pctEl = document.getElementById('pct');
+    const pctRow = document.getElementById('pctRow');
+    const btnStart = document.getElementById('btnStart');
+    const errorBox = document.getElementById('errorBox');
+
+    function setStatus(data) {
+      const status = (data && data.status) || 'none';
+      badge.textContent = status;
+      badge.className = 'status-badge ' + status;
+      if (data && data.job_id != null) {
+        currentJobId = data.job_id;
+        jobIdEl.textContent = data.job_id;
+        jobIdRow.style.display = 'flex';
+        const total = data.total_fixtures || 0;
+        const processed = data.processed_fixtures || 0;
+        const pct = (data.progress_percentage != null) ? data.progress_percentage : (total ? (processed / total * 100) : 0);
+        countsEl.textContent = processed + ' / ' + total;
+        progressBar.style.width = pct + '%';
+        pctEl.textContent = pct.toFixed(1) + '%';
+        progressRow.style.display = 'flex';
+        pctRow.style.display = 'flex';
+        if (data.error_message) {
+          errorBox.textContent = data.error_message;
+          errorBox.classList.add('visible');
+        } else {
+          errorBox.classList.remove('visible');
+        }
+        btnStart.disabled = status === 'running';
+      } else {
+        progressRow.style.display = 'none';
+        pctRow.style.display = 'none';
+        errorBox.classList.remove('visible');
+        btnStart.disabled = false;
+      }
+    }
+
+    async function fetchStatus() {
+      if (!currentJobId) return;
+      try {
+        const r = await fetch(API_BASE + '/ingestion/status/' + currentJobId);
+        if (r.ok) {
+          const data = await r.json();
+          setStatus(data);
+          if (data.status === 'completed' || data.status === 'failed') {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+            btnStart.disabled = false;
+          }
+        }
+      } catch (e) {
+        console.error('Status fetch error', e);
+      }
+    }
+
+    function startRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = setInterval(fetchStatus, 3000);
+      fetchStatus();
+    }
+
+    btnStart.addEventListener('click', async () => {
+      btnStart.disabled = true;
+      errorBox.classList.remove('visible');
+      try {
+        const r = await fetch(API_BASE + '/ingestion/start?season=2026', { method: 'POST' });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const msg = data.detail || r.statusText || 'Errore avvio';
+          errorBox.textContent = msg;
+          errorBox.classList.add('visible');
+          btnStart.disabled = false;
+          return;
+        }
+        currentJobId = data.job_id;
+        setStatus({ job_id: data.job_id, status: 'running', total_fixtures: 0, processed_fixtures: 0, progress_percentage: 0 });
+        startRefresh();
+      } catch (e) {
+        console.error(e);
+        errorBox.textContent = e.message || 'Errore di rete';
+        errorBox.classList.add('visible');
+        btnStart.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

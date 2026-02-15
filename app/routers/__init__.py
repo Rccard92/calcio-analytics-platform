@@ -1,4 +1,5 @@
 from app.routers.db_status import router as db_status_router
 from app.routers.health import router as health_router
+from app.routers.ingestion import router as ingestion_router
 
-__all__ = ["health_router", "db_status_router"]
+__all__ = ["health_router", "db_status_router", "ingestion_router"]
