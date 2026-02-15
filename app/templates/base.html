@@ -63,6 +63,7 @@
       margin: 0 auto;
       padding: 24px 16px;
     }
+    main.teams-page { max-width: 960px; }
     @media (max-width: 640px) {
       .nav { gap: 2px; }
       .nav a { padding: 6px 10px; font-size: 0.85rem; }
@@ -76,12 +77,13 @@
     <nav class="nav">
       <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
       <a href="/ingestion" class="{% if request.url.path == '/ingestion' %}active{% endif %}">Ingestion</a>
+      <a href="/teams" class="{% if request.url.path == '/teams' %}active{% endif %}">Teams</a>
       <a href="/overview" class="{% if request.url.path == '/overview' %}active{% endif %}">Data Overview</a>
       <a href="/api-status" class="{% if request.url.path == '/api-status' %}active{% endif %}">API Status</a>
       <a href="/debug" class="{% if request.url.path == '/debug' %}active{% endif %}">Debug</a>
     </nav>
   </header>
-  <main>
+  <main class="{% block main_class %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
   {% block page_js %}{% endblock %}

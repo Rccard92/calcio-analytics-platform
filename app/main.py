@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.core.database import init_db
-from app.routers import api_test_router, db_status_router, debug_router, dashboard_router, health_router, ingestion_router, leagues_router
+from app.routers import api_test_router, db_status_router, debug_router, dashboard_router, health_router, ingestion_router, leagues_router, teams_router
 
 app = FastAPI(
     title="Calcio Analytics Platform",
@@ -23,6 +23,7 @@ app.include_router(leagues_router)
 app.include_router(api_test_router)
 app.include_router(debug_router)
 app.include_router(dashboard_router)
+app.include_router(teams_router)
 
 templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
@@ -51,6 +52,17 @@ def page_api_status(request: Request):
 @app.get("/debug", include_in_schema=False)
 def page_debug(request: Request):
     return templates.TemplateResponse("debug.html", {"request": request})
+
+
+@app.get("/teams", include_in_schema=False)
+def page_teams(request: Request):
+    return templates.TemplateResponse("teams.html", {"request": request})
+
+
+@app.get("/teams/{team_id}", include_in_schema=False)
+def page_team_detail(request: Request, team_id: int):
+    """Placeholder per Step 2: dettaglio squadra."""
+    return templates.TemplateResponse("team_detail_placeholder.html", {"request": request, "team_id": team_id})
 
 
 static_dir = Path(__file__).parent / "static"

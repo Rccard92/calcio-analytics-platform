@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% block title %}Teams — Calcio Analytics{% endblock %}
+{% block main_class %}teams-page{% endblock %}
+{% block extra_css %}
+<style>
+  .teams-card {
+    background: #22222e;
+    border-radius: 20px;
+    padding: 32px;
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    animation: fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .teams-card h1 { margin: 0 0 8px 0; font-size: 1.5rem; font-weight: 600; }
+  .teams-card .sub { color: #888; font-size: 0.9rem; margin-bottom: 24px; }
+  .teams-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .teams-toolbar .select-wrap { margin-bottom: 0; }
+  .teams-toolbar label { display: block; color: #888; font-size: 0.85rem; margin-bottom: 6px; }
+  .select-season {
+    min-width: 140px;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    border-radius: 12px;
+    border: 1px solid #3d3d55;
+    background: #1e1e28;
+    color: #e2e2e8;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+  .search-input {
+    min-width: 200px;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    border-radius: 12px;
+    border: 1px solid #3d3d55;
+    background: #1e1e28;
+    color: #e2e2e8;
+  }
+  .search-input::placeholder { color: #666; }
+  .search-input:focus { outline: none; border-color: #4a7c59; }
+  .teams-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid #2a2a36; }
+  .teams-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .teams-table th, .teams-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #2a2a36; }
+  .teams-table th { background: #1e1e28; color: #aaa; font-weight: 600; white-space: nowrap; }
+  .teams-table th.numeric { text-align: right; }
+  .teams-table th.sortable { cursor: pointer; user-select: none; }
+  .teams-table th.sortable:hover { color: #e2e2e8; }
+  .teams-table th .sort-icon { opacity: 0.5; margin-left: 4px; }
+  .teams-table th.sorted-asc .sort-icon::after { content: ' ▲'; opacity: 1; }
+  .teams-table th.sorted-desc .sort-icon::after { content: ' ▼'; opacity: 1; }
+  .teams-table td { color: #e2e2e8; }
+  .teams-table td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
+  .teams-table tbody tr { transition: background 0.15s; }
+  .teams-table tbody tr:hover { background: #2a2a36; }
+  .teams-table tbody tr.clickable { cursor: pointer; }
+  .teams-table .team-name { font-weight: 500; color: #e2e2e8; }
+  .teams-table .pct { font-variant-numeric: tabular-nums; }
+  .teams-loading { display: flex; align-items: center; gap: 12px; padding: 40px; color: #888; }
+  .teams-loading .spinner {
+    width: 28px; height: 28px; border: 3px solid #2a2a36; border-top-color: #6ee7a0;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .teams-empty { padding: 48px 24px; text-align: center; color: #888; }
+  .teams-empty p { margin: 0 0 8px 0; font-size: 1rem; }
+  .teams-error {
+    padding: 20px; border-radius: 12px; background: #2a2020; border-left: 4px solid #c55;
+    color: #f08a8a; margin-top: 16px; display: none;
+  }
+  .teams-error.visible { display: block; }
+  .skeleton-row { height: 44px; }
+  .skeleton-cell { background: linear-gradient(90deg, #2a2a36 25%, #333 50%, #2a2a36 75%); background-size: 200% 100%; animation: shimmer 1s infinite; border-radius: 4px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="teams-card">
+  <h1>Teams</h1>
+  <p class="sub">Classifica e statistiche per stagione (solo match conclusi)</p>
+
+  <div class="teams-toolbar">
+    <div class="select-wrap">
+      <label for="seasonSelect">Stagione</label>
+      <select id="seasonSelect" class="select-season" aria-label="Stagione">
+        <option value="2024">2024/2025</option>
+        <option value="">Caricamento…</option>
+      </select>
+    </div>
+    <div class="select-wrap">
+      <label for="searchInput">Cerca squadra</label>
+      <input type="text" id="searchInput" class="search-input" placeholder="Nome squadra…" aria-label="Cerca squadra">
+    </div>
+  </div>
+
+  <div id="teamsError" class="teams-error"></div>
+
+  <div id="teamsLoading" class="teams-loading">
+    <div class="spinner"></div>
+    <span>Caricamento dati…</span>
+  </div>
+
+  <div id="teamsEmpty" class="teams-empty" style="display: none;">
+    <p>Nessuna squadra trovata per questa stagione.</p>
+    <p style="font-size: 0.9rem;">Esegui l’ingestion per la stagione selezionata dalla Dashboard.</p>
+  </div>
+
+  <div id="teamsTableWrap" class="teams-table-wrap" style="display: none;">
+    <table class="teams-table" aria-label="Classifica squadre">
+      <thead>
+        <tr>
+          <th class="sortable" data-sort="team_name">Team <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="played">P <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="wins">W <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="draws">D <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="losses">L <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="goals_for">GF <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="goals_against">GA <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="goal_diff">GD <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="points">Pts <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="clean_sheets">CS <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="btts_pct">BTTS% <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="over25_pct">O2.5% <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="avg_goals_for">Avg GF <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="avg_goals_against">Avg GA <span class="sort-icon"></span></th>
+        </tr>
+      </thead>
+      <tbody id="teamsBody"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<script>
+(function() {
+  const seasonSelect = document.getElementById('seasonSelect');
+  const searchInput = document.getElementById('searchInput');
+  const teamsLoading = document.getElementById('teamsLoading');
+  const teamsEmpty = document.getElementById('teamsEmpty');
+  const teamsTableWrap = document.getElementById('teamsTableWrap');
+  const teamsBody = document.getElementById('teamsBody');
+  const teamsError = document.getElementById('teamsError');
+
+  let allTeams = [];
+  let sortKey = 'points';
+  let sortDir = 'desc';
+
+  function showLoading(show) {
+    teamsLoading.style.display = show ? 'flex' : 'none';
+  }
+  function showEmpty(show) {
+    teamsEmpty.style.display = show ? 'block' : 'none';
+  }
+  function showTable(show) {
+    teamsTableWrap.style.display = show ? 'block' : 'none';
+  }
+  function showError(msg) {
+    teamsError.textContent = msg || '';
+    teamsError.classList.toggle('visible', !!msg);
+  }
+
+  function getSearchTerm() {
+    return (searchInput.value || '').trim().toLowerCase();
+  }
+
+  function filteredAndSortedRows() {
+    const q = getSearchTerm();
+    let rows = allTeams;
+    if (q) {
+      rows = rows.filter(function(t) { return (t.team_name || '').toLowerCase().indexOf(q) >= 0; });
+    }
+    rows = rows.slice().sort(function(a, b) {
+      let va = a[sortKey];
+      let vb = b[sortKey];
+      if (typeof va === 'string') { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase(); }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return rows;
+  }
+
+  function renderTable() {
+    const rows = filteredAndSortedRows();
+    teamsBody.innerHTML = '';
+    rows.forEach(function(t) {
+      const tr = document.createElement('tr');
+      tr.className = 'clickable';
+      tr.setAttribute('data-team-id', t.team_id);
+      tr.innerHTML =
+        '<td class="team-name">' + escapeHtml(t.team_name || '—') + '</td>' +
+        '<td class="numeric">' + (t.played ?? '—') + '</td>' +
+        '<td class="numeric">' + (t.wins ?? '—') + '</td>' +
+        '<td class="numeric">' + (t.draws ?? '—') + '</td>' +
+        '<td class="numeric">' + (t.losses ?? '—') + '</td>' +
+        '<td class="numeric">' + (t.goals_for ?? '—') + '</td>' +
+        '<td class="numeric">' + (t.goals_against ?? '—') + '</td>' +
+        '<td class="numeric">' + (t.goal_diff ?? '—') + '</td>' +
+        '<td class="numeric">' + (t.points ?? '—') + '</td>' +
+        '<td class="numeric">' + (t.clean_sheets ?? '—') + '</td>' +
+        '<td class="numeric pct">' + formatPct(t.btts_pct) + '</td>' +
+        '<td class="numeric pct">' + formatPct(t.over25_pct) + '</td>' +
+        '<td class="numeric">' + formatAvg(t.avg_goals_for) + '</td>' +
+        '<td class="numeric">' + formatAvg(t.avg_goals_against) + '</td>';
+      teamsBody.appendChild(tr);
+    });
+    updateSortHeaders();
+  }
+
+  function formatPct(v) {
+    if (v == null) return '—';
+    return Number(v).toFixed(1) + '%';
+  }
+  function formatAvg(v) {
+    if (v == null) return '—';
+    return Number(v).toFixed(2);
+  }
+  function escapeHtml(s) {
+    if (s == null) return '';
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function updateSortHeaders() {
+    document.querySelectorAll('.teams-table th.sortable').forEach(function(th) {
+      const key = th.getAttribute('data-sort');
+      th.classList.remove('sorted-asc', 'sorted-desc');
+      if (key === sortKey) th.classList.add(sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+    });
+  }
+
+  function fetchTeams() {
+    const season = seasonSelect.value ? parseInt(seasonSelect.value, 10) : null;
+    if (season == null || isNaN(season)) {
+      showLoading(false);
+      showEmpty(true);
+      showTable(false);
+      showError('');
+      return;
+    }
+    showError('');
+    showLoading(true);
+    showEmpty(false);
+    showTable(false);
+    fetch('/api/teams/season/' + season + '/overview')
+      .then(function(r) {
+        if (!r.ok) throw new Error(r.status === 404 ? 'Nessun dato per questa stagione' : 'Errore ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        allTeams = (data && data.teams) ? data.teams : [];
+        showLoading(false);
+        if (allTeams.length === 0) {
+          showEmpty(true);
+          showTable(false);
+        } else {
+          showEmpty(false);
+          showTable(true);
+          renderTable();
+        }
+      })
+      .catch(function(e) {
+        showLoading(false);
+        showEmpty(false);
+        showTable(false);
+        showError(e.message || 'Errore di rete.');
+      });
+  }
+
+  seasonSelect.addEventListener('change', fetchTeams);
+  searchInput.addEventListener('input', function() { if (allTeams.length) renderTable(); });
+
+  document.querySelectorAll('.teams-table th.sortable').forEach(function(th) {
+    th.addEventListener('click', function() {
+      const key = th.getAttribute('data-sort');
+      if (key === sortKey) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortKey = key; sortDir = 'desc'; }
+      renderTable();
+    });
+  });
+
+  document.getElementById('teamsBody').addEventListener('click', function(e) {
+    const tr = e.target.closest('tr.clickable');
+    if (!tr) return;
+    const teamId = tr.getAttribute('data-team-id');
+    const season = seasonSelect.value || '2024';
+    if (teamId) {
+      console.log('Team click:', teamId, 'season', season);
+      window.location.href = '/teams/' + teamId + '?season=' + encodeURIComponent(season);
+    }
+  });
+
+  (function initSeasons() {
+    fetch('/leagues/seasons')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        const seasons = (data && data.seasons) ? data.seasons : [2024];
+        if (seasons.length === 0) return;
+        seasonSelect.innerHTML = '';
+        seasons.forEach(function(y) {
+          const opt = document.createElement('option');
+          opt.value = y;
+          opt.textContent = y === 2024 ? '2024/2025' : String(y);
+          if (y === 2024) opt.selected = true;
+          seasonSelect.appendChild(opt);
+        });
+        fetchTeams();
+      })
+      .catch(function() {
+        seasonSelect.innerHTML = '<option value="2024">2024/2025</option>';
+        fetchTeams();
+      });
+  })();
+})();
+</script>
+{% endblock %}
