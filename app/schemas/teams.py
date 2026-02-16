@@ -73,20 +73,41 @@ class TeamSeasonOverviewResponse(BaseModel):
 
 
 class PlayerSeasonRow(BaseModel):
-    """Riga rosa: giocatore con statistiche stagionali."""
+    """Riga rosa: giocatore con statistiche stagionali, metriche derivate e scoring."""
     player_id: int
     api_player_id: int = 0
     name: str
-    position: str
+    position: str = ""
+
+    # Dati grezzi dal DB
     appearances: int = 0
     minutes: int = 0
     goals: int = 0
     assists: int = 0
-    shots: int = 0
-    pass_accuracy: float = 0.0
-    rating: float = 0.0
+    shots_total: int = 0
+    shots_on: int = 0
+    pass_accuracy: float | None = None
+    rating: float | None = None
     yellow_cards: int = 0
     red_cards: int = 0
+    tackles_total: int = 0
+    interceptions: int = 0
+    key_passes: int = 0
+
+    # Metriche per-90 (calcolate nel service layer, NON salvate in DB)
+    goals_per_90: float | None = None
+    assists_per_90: float | None = None
+    shots_per_90: float | None = None
+    shots_on_per_90: float | None = None
+    shot_accuracy_pct: float | None = None
+    duels_won_pct: float | None = None
+    dribbles_success_pct: float | None = None
+
+    # Punteggi compositi (calcolati nel service layer)
+    overall_score: float | None = None
+    offensive_score: float | None = None
+    defensive_score: float | None = None
+    discipline_score: float | None = None
 
     class Config:
         from_attributes = True

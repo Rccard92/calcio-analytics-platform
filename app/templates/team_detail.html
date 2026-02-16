@@ -8,7 +8,7 @@
     border-radius: 20px;
     padding: 32px;
     width: 100%;
-    max-width: 960px;
+    max-width: 1280px;
     margin: 0 auto;
     box-shadow: 0 20px 50px rgba(0,0,0,0.4);
     animation: fadeIn 0.4s ease;
@@ -56,10 +56,13 @@
   .players-toolbar .search-input:focus { outline: none; border-color: #4a7c59; }
   .players-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid #2a2a36; margin-bottom: 24px; }
   .players-table {
-    width: 100%; border-collapse: collapse; font-size: 0.9rem;
+    width: 100%; border-collapse: collapse; font-size: 0.82rem;
   }
-  .players-table th, .players-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #2a2a36; }
-  .players-table th { background: #1e1e28; color: #aaa; font-weight: 600; white-space: nowrap; }
+  .players-table th, .players-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #2a2a36; }
+  .players-table th {
+    background: #1e1e28; color: #aaa; font-weight: 600; white-space: nowrap;
+    position: sticky; top: 0; z-index: 1;
+  }
   .players-table th.numeric { text-align: right; }
   .players-table th.sortable { cursor: pointer; user-select: none; }
   .players-table th.sortable:hover { color: #e2e2e8; }
@@ -69,8 +72,15 @@
   .players-table td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
   .players-table tbody tr.clickable { cursor: pointer; transition: background 0.15s; }
   .players-table tbody tr.clickable:hover { background: #2a2a36; }
-  .player-id-link { color: #6a6a7a; font-size: 0.8rem; font-family: monospace; text-decoration: none; transition: color 0.15s; }
+  .player-id-link { color: #6a6a7a; font-size: 0.75rem; font-family: monospace; text-decoration: none; transition: color 0.15s; }
   .player-id-link:hover { color: #6ee7a0; text-decoration: underline; }
+  /* Score color classes */
+  .score-high { color: #6ee7a0; font-weight: 700; }
+  .score-mid  { color: #e7c66e; font-weight: 600; }
+  .score-low  { color: #f08a8a; font-weight: 600; }
+  .score-none { color: #555; }
+  .per90-val  { color: #8a8aaa; font-size: 0.8rem; }
+  .pct-val    { color: #8a8aaa; font-size: 0.8rem; }
   .detail-loading { display: flex; align-items: center; gap: 12px; padding: 40px; color: #888; }
   .detail-loading .spinner {
     width: 28px; height: 28px; border: 3px solid #2a2a36; border-top-color: #6ee7a0;
@@ -177,15 +187,27 @@
               <th class="sortable numeric" data-sort="api_player_id">ID</th>
               <th class="sortable" data-sort="name">Nome</th>
               <th class="sortable" data-sort="position">Pos</th>
-              <th class="sortable numeric" data-sort="appearances">Pres</th>
-              <th class="sortable numeric" data-sort="minutes">Min</th>
-              <th class="sortable numeric" data-sort="goals">G</th>
-              <th class="sortable numeric" data-sort="assists">A</th>
-              <th class="sortable numeric" data-sort="shots">Tiri</th>
-              <th class="sortable numeric" data-sort="pass_accuracy">Prec. pass.</th>
-              <th class="sortable numeric" data-sort="rating">Voto</th>
-              <th class="sortable numeric" data-sort="yellow_cards">Amm</th>
-              <th class="sortable numeric" data-sort="red_cards">Esp</th>
+              <th class="sortable numeric" data-sort="overall_score" title="Punteggio complessivo">Score</th>
+              <th class="sortable numeric" data-sort="appearances" title="Presenze">Pres</th>
+              <th class="sortable numeric" data-sort="minutes" title="Minuti giocati">Min</th>
+              <th class="sortable numeric" data-sort="goals" title="Gol">G</th>
+              <th class="sortable numeric" data-sort="goals_per_90" title="Gol ogni 90 minuti">G/90</th>
+              <th class="sortable numeric" data-sort="assists" title="Assist">A</th>
+              <th class="sortable numeric" data-sort="assists_per_90" title="Assist ogni 90 minuti">A/90</th>
+              <th class="sortable numeric" data-sort="shots_total" title="Tiri totali">Tiri</th>
+              <th class="sortable numeric" data-sort="shots_on" title="Tiri in porta">TP</th>
+              <th class="sortable numeric" data-sort="shot_accuracy_pct" title="Precisione tiri %">T%</th>
+              <th class="sortable numeric" data-sort="shots_per_90" title="Tiri ogni 90 min">T/90</th>
+              <th class="sortable numeric" data-sort="shots_on_per_90" title="Tiri in porta ogni 90 min">TP/90</th>
+              <th class="sortable numeric" data-sort="key_passes" title="Passaggi chiave">PC</th>
+              <th class="sortable numeric" data-sort="tackles_total" title="Contrasti">Contr</th>
+              <th class="sortable numeric" data-sort="interceptions" title="Intercettazioni">Int</th>
+              <th class="sortable numeric" data-sort="duels_won_pct" title="% duelli vinti">%Du</th>
+              <th class="sortable numeric" data-sort="dribbles_success_pct" title="% dribbling riusciti">%Dr</th>
+              <th class="sortable numeric" data-sort="pass_accuracy" title="Precisione passaggi">P%</th>
+              <th class="sortable numeric" data-sort="rating" title="Voto medio">Voto</th>
+              <th class="sortable numeric" data-sort="yellow_cards" title="Ammonizioni">Amm</th>
+              <th class="sortable numeric" data-sort="red_cards" title="Espulsioni">Esp</th>
             </tr>
           </thead>
           <tbody id="playersBody"></tbody>
@@ -203,37 +225,38 @@
 {% block page_js %}
 <script>
 (function() {
-  const cfg = window.TEAM_DETAIL_INIT || { team_id: 0, season: 2024 };
-  const teamId = cfg.team_id;
-  const initialSeason = cfg.season;
+  var cfg = window.TEAM_DETAIL_INIT || { team_id: 0, season: 2024 };
+  var teamId = cfg.team_id;
+  var initialSeason = cfg.season;
 
-  const teamNameEl = document.getElementById('teamName');
-  const teamSubEl = document.getElementById('teamSub');
-  const seasonSelect = document.getElementById('seasonSelect');
-  const detailError = document.getElementById('detailError');
-  const detailLoading = document.getElementById('detailLoading');
-  const detailContent = document.getElementById('detailContent');
-  const seasonStatsEl = document.getElementById('seasonStats');
-  const homeStatsEl = document.getElementById('homeStats');
-  const awayStatsEl = document.getElementById('awayStats');
-  const formBadgesEl = document.getElementById('formBadges');
-  const playerSearch = document.getElementById('playerSearch');
-  const playersLoading = document.getElementById('playersLoading');
-  const playersEmpty = document.getElementById('playersEmpty');
-  const playersTableWrap = document.getElementById('playersTableWrap');
-  const playersBody = document.getElementById('playersBody');
-  const btnLoadRoster = document.getElementById('btnLoadRoster');
-  const ingestResult = document.getElementById('ingestResult');
+  var teamNameEl = document.getElementById('teamName');
+  var teamSubEl = document.getElementById('teamSub');
+  var seasonSelect = document.getElementById('seasonSelect');
+  var detailError = document.getElementById('detailError');
+  var detailLoading = document.getElementById('detailLoading');
+  var detailContent = document.getElementById('detailContent');
+  var seasonStatsEl = document.getElementById('seasonStats');
+  var homeStatsEl = document.getElementById('homeStats');
+  var awayStatsEl = document.getElementById('awayStats');
+  var formBadgesEl = document.getElementById('formBadges');
+  var playerSearch = document.getElementById('playerSearch');
+  var playersLoading = document.getElementById('playersLoading');
+  var playersEmpty = document.getElementById('playersEmpty');
+  var playersTableWrap = document.getElementById('playersTableWrap');
+  var playersBody = document.getElementById('playersBody');
+  var btnLoadRoster = document.getElementById('btnLoadRoster');
+  var ingestResult = document.getElementById('ingestResult');
 
-  let detailData = null;
-  let allPlayers = [];
-  let sortKey = 'name';
-  let sortDir = 'asc';
+  var detailData = null;
+  var allPlayers = [];
+  var sortKey = 'overall_score';
+  var sortDir = 'desc';
 
   function setError(msg) {
     detailError.textContent = msg || '';
     detailError.classList.toggle('visible', !!msg);
   }
+
   function renderStatRows(stats) {
     if (!stats) return '';
     return '<div class="stat-row"><span class="label">G</span><span>' + (stats.played ?? '—') + '</span></div>' +
@@ -244,6 +267,7 @@
       '<div class="stat-row"><span class="label">Media GF</span><span>' + (stats.avg_goals_for != null ? Number(stats.avg_goals_for).toFixed(2) : '—') + '</span></div>' +
       '<div class="stat-row"><span class="label">Media GS</span><span>' + (stats.avg_goals_against != null ? Number(stats.avg_goals_against).toFixed(2) : '—') + '</span></div>';
   }
+
   var resultLabelMap = { 'W': 'V', 'D': 'N', 'L': 'S' };
   function renderForm(formLast5) {
     if (!formLast5 || formLast5.length === 0) return '<span style="color:#888;">Nessuna partita</span>';
@@ -253,27 +277,67 @@
       return '<span class="form-badge ' + r + '" title="' + (m.goals_for ?? 0) + '-' + (m.goals_against ?? 0) + '">' + label + '</span>';
     }).join('');
   }
+
   function escapeHtml(s) {
     if (s == null) return '';
     var div = document.createElement('div');
     div.textContent = s;
     return div.innerHTML;
   }
+
+  /* ---------- Formattatori valori ---------- */
+
+  function fmtInt(v) {
+    if (v == null) return '—';
+    return String(v);
+  }
+
+  function fmtDec(v, dec) {
+    if (v == null) return '<span class="per90-val">—</span>';
+    return '<span class="per90-val">' + Number(v).toFixed(dec != null ? dec : 2) + '</span>';
+  }
+
+  function fmtPct(v) {
+    if (v == null) return '<span class="pct-val">—</span>';
+    return '<span class="pct-val">' + Number(v).toFixed(1) + '%</span>';
+  }
+
+  function fmtScore(v) {
+    if (v == null) return '<span class="score-none">—</span>';
+    var cls = v >= 65 ? 'score-high' : v >= 40 ? 'score-mid' : 'score-low';
+    return '<span class="' + cls + '">' + Number(v).toFixed(1) + '</span>';
+  }
+
+  function fmtRating(v) {
+    if (v == null || v === 0) return '—';
+    return Number(v).toFixed(2);
+  }
+
+  /* ---------- Sorting ---------- */
+
   function getSearchTerm() {
     return (playerSearch.value || '').trim().toLowerCase();
   }
+
   function filteredAndSortedPlayers() {
     var q = getSearchTerm();
     var list = q ? allPlayers.filter(function(p) { return (p.name || '').toLowerCase().indexOf(q) >= 0; }) : allPlayers.slice();
     list.sort(function(a, b) {
       var va = a[sortKey], vb = b[sortKey];
-      if (typeof va === 'string') { va = (va || '').toLowerCase(); vb = (vb || '').toLowerCase(); }
+      /* null sempre in fondo indipendentemente dalla direzione */
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb || '').toLowerCase(); }
       if (va < vb) return sortDir === 'asc' ? -1 : 1;
       if (va > vb) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
     return list;
   }
+
+  /* ---------- Render tabella ---------- */
+
   function renderPlayersTable() {
     var rows = filteredAndSortedPlayers();
     playersBody.innerHTML = '';
@@ -283,18 +347,31 @@
       tr.setAttribute('data-player-id', p.player_id);
       var pidVal = p.api_player_id || p.player_id || 0;
       var seasonVal = getCurrentSeason();
-      tr.innerHTML = '<td class="numeric"><a href="/api/debug/player/' + pidVal + '/season/' + seasonVal + '" class="player-id-link" title="API Player ID" onclick="event.stopPropagation()">' + pidVal + '</a></td>' +
+      tr.innerHTML =
+        '<td class="numeric"><a href="/api/debug/player/' + pidVal + '/season/' + seasonVal + '" class="player-id-link" title="API Player ID" onclick="event.stopPropagation()">' + pidVal + '</a></td>' +
         '<td>' + escapeHtml(p.name || '—') + '</td>' +
         '<td>' + escapeHtml(p.position || '—') + '</td>' +
-        '<td class="numeric">' + (p.appearances ?? '—') + '</td>' +
-        '<td class="numeric">' + (p.minutes ?? '—') + '</td>' +
-        '<td class="numeric">' + (p.goals ?? '—') + '</td>' +
-        '<td class="numeric">' + (p.assists ?? '—') + '</td>' +
-        '<td class="numeric">' + (p.shots ?? '—') + '</td>' +
-        '<td class="numeric">' + (p.pass_accuracy != null ? Number(p.pass_accuracy).toFixed(1) + '%' : '—') + '</td>' +
-        '<td class="numeric">' + (p.rating != null ? Number(p.rating).toFixed(2) : '—') + '</td>' +
-        '<td class="numeric">' + (p.yellow_cards ?? '—') + '</td>' +
-        '<td class="numeric">' + (p.red_cards ?? '—') + '</td>';
+        '<td class="numeric">' + fmtScore(p.overall_score) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.appearances) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.minutes) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.goals) + '</td>' +
+        '<td class="numeric">' + fmtDec(p.goals_per_90, 2) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.assists) + '</td>' +
+        '<td class="numeric">' + fmtDec(p.assists_per_90, 2) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.shots_total) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.shots_on) + '</td>' +
+        '<td class="numeric">' + fmtPct(p.shot_accuracy_pct) + '</td>' +
+        '<td class="numeric">' + fmtDec(p.shots_per_90, 2) + '</td>' +
+        '<td class="numeric">' + fmtDec(p.shots_on_per_90, 2) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.key_passes) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.tackles_total) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.interceptions) + '</td>' +
+        '<td class="numeric">' + fmtPct(p.duels_won_pct) + '</td>' +
+        '<td class="numeric">' + fmtPct(p.dribbles_success_pct) + '</td>' +
+        '<td class="numeric">' + fmtPct(p.pass_accuracy) + '</td>' +
+        '<td class="numeric">' + fmtRating(p.rating) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.yellow_cards) + '</td>' +
+        '<td class="numeric">' + fmtInt(p.red_cards) + '</td>';
       playersBody.appendChild(tr);
     });
     document.querySelectorAll('.players-table th.sortable').forEach(function(th) {
@@ -302,6 +379,8 @@
       if (th.getAttribute('data-sort') === sortKey) th.classList.add(sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
     });
   }
+
+  /* ---------- Data loading ---------- */
 
   function loadDetail(season) {
     setError('');
@@ -329,6 +408,7 @@
         setError(e.message || 'Errore di rete.');
       });
   }
+
   function loadPlayers(season) {
     playersLoading.style.display = 'flex';
     playersEmpty.style.display = 'none';
@@ -351,19 +431,28 @@
       });
   }
 
+  /* ---------- Event listeners ---------- */
+
   seasonSelect.addEventListener('change', function() {
     var s = parseInt(seasonSelect.value, 10);
     if (!isNaN(s)) window.location.href = '/teams/' + teamId + '?season=' + s;
   });
+
   playerSearch.addEventListener('input', function() { if (allPlayers.length) renderPlayersTable(); });
+
   document.querySelectorAll('.players-table th.sortable').forEach(function(th) {
     th.addEventListener('click', function() {
       var key = th.getAttribute('data-sort');
-      if (key === sortKey) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-      else { sortKey = key; sortDir = key === 'name' ? 'asc' : 'desc'; }
+      if (key === sortKey) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortKey = key;
+        sortDir = (key === 'name' || key === 'position') ? 'asc' : 'desc';
+      }
       renderPlayersTable();
     });
   });
+
   playersBody.addEventListener('click', function(e) {
     var tr = e.target.closest('tr.clickable');
     if (!tr) return;
@@ -374,6 +463,8 @@
   function getCurrentSeason() {
     return parseInt(seasonSelect.value, 10) || initialSeason;
   }
+
+  /* ---------- Ingestion ---------- */
 
   function ingestPlayers() {
     var season = getCurrentSeason();
@@ -405,6 +496,8 @@
   }
 
   btnLoadRoster.addEventListener('click', ingestPlayers);
+
+  /* ---------- Init ---------- */
 
   (function init() {
     fetch('/leagues/seasons').then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
