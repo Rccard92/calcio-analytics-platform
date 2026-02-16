@@ -75,6 +75,7 @@ class TeamSeasonOverviewResponse(BaseModel):
 class PlayerSeasonRow(BaseModel):
     """Riga rosa: giocatore con statistiche stagionali."""
     player_id: int
+    api_player_id: int = 0
     name: str
     position: str
     appearances: int = 0

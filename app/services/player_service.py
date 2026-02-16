@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 TEAM_PLAYERS_SQL = text("""
 SELECT
   p.id AS player_id,
+  COALESCE(p.api_player_id, 0) AS api_player_id,
   p.name AS name,
   COALESCE(p.position, '') AS position,
   COALESCE(s.appearances, 0)::INT AS appearances,
@@ -36,6 +37,7 @@ ORDER BY p.name
 TEAM_PLAYERS_SQL_LEGACY = text("""
 SELECT
   p.id AS player_id,
+  COALESCE(p.api_player_id, 0) AS api_player_id,
   p.name AS name,
   COALESCE(p.position, '') AS position,
   COALESCE(s.appearances, 0)::INT AS appearances,
@@ -59,6 +61,7 @@ def _rows_to_list(rows: list) -> list[PlayerSeasonRow]:
     return [
         PlayerSeasonRow(
             player_id=r["player_id"],
+            api_player_id=r["api_player_id"] or 0,
             name=r["name"] or "",
             position=r["position"] or "",
             appearances=r["appearances"] or 0,

@@ -69,6 +69,8 @@
   .players-table td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
   .players-table tbody tr.clickable { cursor: pointer; transition: background 0.15s; }
   .players-table tbody tr.clickable:hover { background: #2a2a36; }
+  .player-id-link { color: #6a6a7a; font-size: 0.8rem; font-family: monospace; text-decoration: none; transition: color 0.15s; }
+  .player-id-link:hover { color: #6ee7a0; text-decoration: underline; }
   .detail-loading { display: flex; align-items: center; gap: 12px; padding: 40px; color: #888; }
   .detail-loading .spinner {
     width: 28px; height: 28px; border: 3px solid #2a2a36; border-top-color: #6ee7a0;
@@ -172,6 +174,7 @@
         <table class="players-table" aria-label="Rosa giocatori">
           <thead>
             <tr>
+              <th class="sortable numeric" data-sort="api_player_id">ID</th>
               <th class="sortable" data-sort="name">Nome</th>
               <th class="sortable" data-sort="position">Pos</th>
               <th class="sortable numeric" data-sort="appearances">Pres</th>
@@ -278,7 +281,10 @@
       var tr = document.createElement('tr');
       tr.className = 'clickable';
       tr.setAttribute('data-player-id', p.player_id);
-      tr.innerHTML = '<td>' + escapeHtml(p.name || '—') + '</td>' +
+      var pidVal = p.api_player_id || p.player_id || 0;
+      var seasonVal = getCurrentSeason();
+      tr.innerHTML = '<td class="numeric"><a href="/debug/player/' + pidVal + '?season=' + seasonVal + '" class="player-id-link" title="API Player ID" onclick="event.stopPropagation()">' + pidVal + '</a></td>' +
+        '<td>' + escapeHtml(p.name || '—') + '</td>' +
         '<td>' + escapeHtml(p.position || '—') + '</td>' +
         '<td class="numeric">' + (p.appearances ?? '—') + '</td>' +
         '<td class="numeric">' + (p.minutes ?? '—') + '</td>' +
