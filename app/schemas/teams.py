@@ -103,10 +103,11 @@ class PlayerSeasonRow(BaseModel):
     duels_won_pct: float | None = None
     dribbles_success_pct: float | None = None
 
-    # Punteggi compositi (calcolati nel service layer)
+    # Punteggi compositi (calcolati nel service layer, normalizzati league-wide)
     overall_score: float | None = None
     offensive_score: float | None = None
     defensive_score: float | None = None
+    playmaking_score: float | None = None
     discipline_score: float | None = None
 
     class Config:
