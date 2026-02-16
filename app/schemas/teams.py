@@ -77,12 +77,15 @@ class PlayerSeasonRow(BaseModel):
     player_id: int
     name: str
     position: str
-    minutes: int
-    goals: int
-    assists: int
-    shots: int
-    pass_accuracy: float
-    rating: float
+    appearances: int = 0
+    minutes: int = 0
+    goals: int = 0
+    assists: int = 0
+    shots: int = 0
+    pass_accuracy: float = 0.0
+    rating: float = 0.0
+    yellow_cards: int = 0
+    red_cards: int = 0
 
     class Config:
         from_attributes = True

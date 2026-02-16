@@ -174,12 +174,15 @@
             <tr>
               <th class="sortable" data-sort="name">Nome</th>
               <th class="sortable" data-sort="position">Pos</th>
+              <th class="sortable numeric" data-sort="appearances">Pres</th>
               <th class="sortable numeric" data-sort="minutes">Min</th>
               <th class="sortable numeric" data-sort="goals">G</th>
               <th class="sortable numeric" data-sort="assists">A</th>
               <th class="sortable numeric" data-sort="shots">Tiri</th>
               <th class="sortable numeric" data-sort="pass_accuracy">Prec. pass.</th>
               <th class="sortable numeric" data-sort="rating">Voto</th>
+              <th class="sortable numeric" data-sort="yellow_cards">Amm</th>
+              <th class="sortable numeric" data-sort="red_cards">Esp</th>
             </tr>
           </thead>
           <tbody id="playersBody"></tbody>
@@ -277,12 +280,15 @@
       tr.setAttribute('data-player-id', p.player_id);
       tr.innerHTML = '<td>' + escapeHtml(p.name || '—') + '</td>' +
         '<td>' + escapeHtml(p.position || '—') + '</td>' +
+        '<td class="numeric">' + (p.appearances ?? '—') + '</td>' +
         '<td class="numeric">' + (p.minutes ?? '—') + '</td>' +
         '<td class="numeric">' + (p.goals ?? '—') + '</td>' +
         '<td class="numeric">' + (p.assists ?? '—') + '</td>' +
         '<td class="numeric">' + (p.shots ?? '—') + '</td>' +
         '<td class="numeric">' + (p.pass_accuracy != null ? Number(p.pass_accuracy).toFixed(1) + '%' : '—') + '</td>' +
-        '<td class="numeric">' + (p.rating != null ? Number(p.rating).toFixed(2) : '—') + '</td>';
+        '<td class="numeric">' + (p.rating != null ? Number(p.rating).toFixed(2) : '—') + '</td>' +
+        '<td class="numeric">' + (p.yellow_cards ?? '—') + '</td>' +
+        '<td class="numeric">' + (p.red_cards ?? '—') + '</td>';
       playersBody.appendChild(tr);
     });
     document.querySelectorAll('.players-table th.sortable').forEach(function(th) {
