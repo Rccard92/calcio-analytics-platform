@@ -3,9 +3,9 @@ Distribuzione metriche per ruolo — baseline per il percentile empirico.
 
 Flusso:
   1. Carica tutti i player_season_stats con >= 300 minuti
-  2. Raggruppa per ruolo (Goalkeeper/Defender/Midfielder/Attacker)
+  2. Normalizza posizioni API in ruoli (Goalkeeper/Defender/Midfielder/Attacker)
   3. Calcola metriche derivate per ogni giocatore
-  4. Winsorize al 1° e 99° percentile per tagliare outlier
+  4. Winsorize al 1 e 99 percentile per tagliare outlier
   5. Salva valori ordinati per ogni metrica per lookup percentile O(log n)
 
 Tutto in-memory, niente DB. Cache opzionale in futuro.
@@ -29,8 +29,56 @@ MIN_MINUTES = 300
 # Type alias: { role: { metric: sorted_values } }
 RoleDistributions = dict[str, dict[str, list[float]]]
 
-# Tutte le metriche che entrano nella distribuzione
-# (escluse direct_score come 'captain' e stub come 'match_winning_goals')
+# ---------------------------------------------------------------------------
+# Normalizzazione posizioni API-Football -> ruolo
+# ---------------------------------------------------------------------------
+
+_POSITION_MAP: dict[str, str] = {
+    "goalkeeper": "Goalkeeper",
+    "defender": "Defender",
+    "centre-back": "Defender",
+    "center-back": "Defender",
+    "right-back": "Defender",
+    "left-back": "Defender",
+    "midfielder": "Midfielder",
+    "defensive midfield": "Midfielder",
+    "central midfield": "Midfielder",
+    "attacking midfield": "Midfielder",
+    "right midfield": "Midfielder",
+    "left midfield": "Midfielder",
+    "attacker": "Attacker",
+    "forward": "Attacker",
+    "striker": "Attacker",
+    "centre-forward": "Attacker",
+    "right winger": "Attacker",
+    "left winger": "Attacker",
+    "second striker": "Attacker",
+    "winger": "Attacker",
+}
+
+VALID_ROLES = frozenset({"Goalkeeper", "Defender", "Midfielder", "Attacker"})
+
+
+def normalize_position(raw: str | None) -> str:
+    """
+    Mappa posizioni dettagliate API-Football in uno dei 4 ruoli canonici.
+    Fallback: Midfielder se non riconosciuto.
+    """
+    if not raw:
+        return "Midfielder"
+    key = raw.strip().lower()
+    mapped = _POSITION_MAP.get(key)
+    if mapped:
+        return mapped
+    if raw in VALID_ROLES:
+        return raw
+    return "Midfielder"
+
+
+# ---------------------------------------------------------------------------
+# Metriche distribuite
+# ---------------------------------------------------------------------------
+
 DISTRIBUTABLE_METRICS = frozenset({
     "goals_per_90", "assists_per_90", "shots_on_per_90",
     "key_passes_per_90", "tackles_per_90", "interceptions_per_90",
@@ -40,6 +88,7 @@ DISTRIBUTABLE_METRICS = frozenset({
     "dribbles_success_pct",
     "minutes", "appearances", "rating",
     "clean_sheet_rate", "penalty_saved_rate",
+    "save_pct", "goals_conceded_adjusted",
 })
 
 
@@ -158,6 +207,15 @@ def compute_player_metrics(
     if penalty_saved is not None and appearances and appearances > 0:
         penalty_saved_rate = round((penalty_saved / appearances) * 100, 1)
 
+    saves = stats.get("saves")
+    goals_conceded = stats.get("goals_conceded")
+    shots_faced = (saves or 0) + (goals_conceded or 0)
+    save_pct = None
+    goals_conceded_adjusted = None
+    if shots_faced > 0:
+        save_pct = round((saves or 0) / shots_faced * 100, 1)
+        goals_conceded_adjusted = round((goals_conceded or 0) / shots_faced * 100, 1)
+
     return {
         # Per-90
         "goals_per_90": _per_90(stats.get("goals"), minutes),
@@ -183,6 +241,9 @@ def compute_player_metrics(
         "minutes": minutes if minutes is not None and minutes >= MIN_MINUTES else None,
         "appearances": stats.get("appearances"),
         "rating": _nullable_float(rating),
+        # GK-specific
+        "save_pct": save_pct,
+        "goals_conceded_adjusted": goals_conceded_adjusted,
         # Impact (da lineups/fixtures)
         "clean_sheet_rate": clean_sheet_rate,
         "penalty_saved_rate": penalty_saved_rate,
@@ -351,9 +412,7 @@ def build_role_distributions(
     for row in rows:
         r = dict(row)
         r["pass_accuracy"] = _nullable_float(r.get("passes_accuracy"))
-        role = r.get("position") or "Midfielder"
-        if role not in role_raw:
-            role = "Midfielder"
+        role = normalize_position(r.get("position"))
 
         api_pid = r.get("api_player_id")
         derived = compute_player_metrics(r, cs_data)

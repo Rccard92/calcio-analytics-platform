@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.analytics.league_distribution import normalize_position
 from app.models import Player, PlayerSeasonStats
 from app.services.api_sports_client import ApiSportsClient
 
@@ -234,7 +235,8 @@ def _extract_player_data(
     best_stat = _pick_best_stat(statistics_list, team_id, season)
     parsed = _extract_stats_from_block(best_stat)
 
-    position = parsed.pop("position", None) or player_info.get("position")
+    raw_position = parsed.pop("position", None) or player_info.get("position")
+    position = normalize_position(raw_position)
 
     return {
         "api_player_id": int(api_player_id),

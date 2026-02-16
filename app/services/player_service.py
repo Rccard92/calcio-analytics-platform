@@ -17,6 +17,7 @@ from app.analytics.league_distribution import (
     RoleDistributions,
     build_role_distributions,
     compute_player_metrics,
+    normalize_position,
 )
 from app.schemas.teams import PlayerSeasonRow
 
@@ -164,19 +165,20 @@ def _enrich_row(
     """
     raw = _row_to_stats_dict(row)
     api_pid = raw.get("api_player_id") or 0
+    position = normalize_position(raw.get("position"))
 
     if api_pid and api_pid in player_cache:
         derived = player_cache[api_pid]
     else:
         derived = compute_player_metrics(raw)
 
-    scores = calculate_player_score(derived, role_dists, raw.get("position"))
+    scores = calculate_player_score(derived, role_dists, position)
 
     return PlayerSeasonRow(
         player_id=row["player_id"],
         api_player_id=api_pid,
         name=row.get("name") or "",
-        position=raw["position"],
+        position=position,
         appearances=_safe_int(row.get("appearances")),
         minutes=_safe_int(row.get("minutes")),
         goals=_safe_int(row.get("goals")),
@@ -190,6 +192,9 @@ def _enrich_row(
         tackles_total=_safe_int(row.get("tackles_total")),
         interceptions=_safe_int(row.get("interceptions")),
         key_passes=_safe_int(row.get("key_passes")),
+        saves=_safe_int(row.get("saves")),
+        goals_conceded=_safe_int(row.get("goals_conceded")),
+        blocks=_safe_int(row.get("blocks")),
         # Metriche derivate per tabella
         goals_per_90=derived.get("goals_per_90"),
         assists_per_90=derived.get("assists_per_90"),
@@ -198,6 +203,8 @@ def _enrich_row(
         shot_accuracy_pct=derived.get("shot_accuracy_pct"),
         duels_won_pct=derived.get("duels_won_pct"),
         dribbles_success_pct=derived.get("dribbles_success_pct"),
+        save_pct=derived.get("save_pct"),
+        clean_sheet_rate=derived.get("clean_sheet_rate"),
         # Scoring
         overall_score=scores.get("overall_score"),
         attack_score=scores.get("attack_score"),

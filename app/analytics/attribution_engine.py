@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 MIN_MINUTES = 300
 RELIABILITY_MINUTES = 1200
 
-INVERSE_METRICS = frozenset({"goals_conceded_per_90"})
+INVERSE_METRICS = frozenset({"goals_conceded_per_90", "goals_conceded_adjusted"})
 DIRECT_SCORE_METRICS = frozenset({"captain"})
 CAPTAIN_SCORE_YES = 85.0
 CAPTAIN_SCORE_NO = 40.0
@@ -47,21 +47,22 @@ CAPTAIN_SCORE_NO = 40.0
 # Configurazione pesi per ruolo
 # ---------------------------------------------------------------------------
 
+# GK: nessuna metrica offensiva, focus su parate e solidita'
 GOALKEEPER_CONFIG: dict[str, Any] = {
     "tier_a": {
         "weight": 70,
         "metrics": {
-            "saves_per_90": 25,
-            "goals_conceded_per_90": 25,
+            "save_pct": 30,
+            "goals_conceded_adjusted": 15,
             "clean_sheet_rate": 15,
-            "penalty_saved_rate": 5,
+            "penalty_saved_rate": 10,
         },
     },
     "tier_b": {
         "weight": 20,
         "metrics": {
             "pass_accuracy": 8,
-            "distribution_quality": 5,
+            "rating": 5,
             "minutes": 7,
         },
     },
@@ -184,7 +185,7 @@ CATEGORY_METRICS: dict[str, list[str]] = {
     ],
     "defense": [
         "tackles_per_90", "interceptions_per_90", "duels_won_pct",
-        "blocks_per_90", "saves_per_90", "goals_conceded_per_90",
+        "blocks_per_90", "save_pct", "goals_conceded_adjusted",
         "clean_sheet_rate", "ball_recoveries",
     ],
     "impact": [
@@ -192,6 +193,51 @@ CATEGORY_METRICS: dict[str, list[str]] = {
         "match_winning_goals", "points_contribution",
         "match_decisive_saves", "match_decisive_actions",
         "match_impact_index", "captain",
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# Disclaimer per ruolo (visibile nel frontend)
+# ---------------------------------------------------------------------------
+
+ROLE_DISCLAIMERS: dict[str, str] = {
+    "Goalkeeper": "Score basato su: % Parate, Gol Subiti adj., Clean Sheet %, Rigori parati, Pass %, Rating, Minuti",
+    "Defender": "Score basato su: Contrasti, Intercettazioni, Blocchi, Duelli %, Clean Sheet %, Pass %, Gol, Rating, Minuti",
+    "Midfielder": "Score basato su: Pass chiave, Assist, Pass %, Contrasti, Duelli %, Gol, Rating, Minuti",
+    "Attacker": "Score basato su: Gol, Tiri in porta, Assist, Dribbling %, Pass chiave, Pass %, Rating, Minuti",
+}
+
+# Colonne da mostrare nella tabella frontend per ogni ruolo
+ROLE_TABLE_COLUMNS: dict[str, list[str]] = {
+    "Goalkeeper": [
+        "api_player_id", "name", "overall_score",
+        "appearances", "minutes", "save_pct", "saves", "goals_conceded",
+        "clean_sheet_rate", "pass_accuracy", "rating",
+        "yellow_cards", "red_cards",
+    ],
+    "Defender": [
+        "api_player_id", "name", "overall_score",
+        "appearances", "minutes",
+        "tackles_total", "interceptions", "blocks",
+        "duels_won_pct", "clean_sheet_rate", "pass_accuracy",
+        "goals", "assists", "rating",
+        "yellow_cards", "red_cards",
+    ],
+    "Midfielder": [
+        "api_player_id", "name", "overall_score",
+        "appearances", "minutes",
+        "goals", "goals_per_90", "assists", "assists_per_90",
+        "key_passes", "tackles_total",
+        "duels_won_pct", "dribbles_success_pct", "pass_accuracy",
+        "rating", "yellow_cards", "red_cards",
+    ],
+    "Attacker": [
+        "api_player_id", "name", "overall_score",
+        "appearances", "minutes",
+        "goals", "goals_per_90", "assists", "assists_per_90",
+        "shots_total", "shots_on", "shot_accuracy_pct",
+        "key_passes", "dribbles_success_pct",
+        "rating", "yellow_cards", "red_cards",
     ],
 }
 

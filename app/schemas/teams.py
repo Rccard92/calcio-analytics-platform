@@ -94,8 +94,11 @@ class PlayerSeasonRow(BaseModel):
     tackles_total: int = 0
     interceptions: int = 0
     key_passes: int = 0
+    saves: int = 0
+    goals_conceded: int = 0
+    blocks: int = 0
 
-    # Metriche per-90 (calcolate nel service layer, NON salvate in DB)
+    # Metriche derivate (calcolate nel service layer, NON salvate in DB)
     goals_per_90: float | None = None
     assists_per_90: float | None = None
     shots_per_90: float | None = None
@@ -103,6 +106,8 @@ class PlayerSeasonRow(BaseModel):
     shot_accuracy_pct: float | None = None
     duels_won_pct: float | None = None
     dribbles_success_pct: float | None = None
+    save_pct: float | None = None
+    clean_sheet_rate: float | None = None
 
     # Punteggi compositi — FIFA-style, normalizzati per ruolo con Tier A/B/C
     overall_score: float | None = None

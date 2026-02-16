@@ -64,6 +64,10 @@
   .role-badge.mid { background: #352a4a; color: #b68af7; }
   .role-badge.att { background: #4a2020; color: #f28a8a; }
   .role-count { font-size: 0.75rem; color: #666; }
+  .role-disclaimer {
+    font-size: 0.7rem; color: #666; margin: 0 0 6px 2px;
+    font-style: italic; letter-spacing: 0.01em;
+  }
 
   /* --- Tabella compatta --- */
   .players-table-wrap {
@@ -224,8 +228,7 @@
   var ingestResult = document.getElementById('ingestResult');
 
   var allPlayers = [];
-  var sortKey = 'overall_score';
-  var sortDir = 'desc';
+  var sortStates = {};
 
   /* ---------- Configurazione gruppi ruolo ---------- */
 
@@ -236,36 +239,71 @@
     { key: 'Attacker',    label: 'Attaccanti',     css: 'att' }
   ];
 
-  var COL_WIDTHS = [
-    '3.2%','11%','4%','3%','4%','2.8%','4%','2.8%','4%',
-    '3%','3%','4%','4%','4.2%','3%','3.2%','3%','4.2%','4.2%','4%','4%','3.2%','3%'
-  ];
+  /* ---------- Catalogo colonne (ogni colonna definita una sola volta) ---------- */
 
-  var COL_HEADERS = [
-    { sort: 'api_player_id', label: 'ID',  title: 'API Player ID' },
-    { sort: 'name',          label: 'Nome', title: 'Nome giocatore', cls: 'col-name-h' },
-    { sort: 'overall_score', label: 'Sc',  title: 'Punteggio complessivo' },
-    { sort: 'appearances',   label: 'Pr',  title: 'Presenze' },
-    { sort: 'minutes',       label: 'Min', title: 'Minuti giocati' },
-    { sort: 'goals',         label: 'G',   title: 'Gol' },
-    { sort: 'goals_per_90',  label: 'G90', title: 'Gol ogni 90 minuti' },
-    { sort: 'assists',       label: 'A',   title: 'Assist' },
-    { sort: 'assists_per_90',label: 'A90', title: 'Assist ogni 90 minuti' },
-    { sort: 'shots_total',   label: 'ST',  title: 'Tiri totali' },
-    { sort: 'shots_on',      label: 'SO',  title: 'Tiri in porta' },
-    { sort: 'shot_accuracy_pct', label: 'T%',  title: 'Precisione tiri %' },
-    { sort: 'shots_per_90',  label: 'T90', title: 'Tiri ogni 90 min' },
-    { sort: 'shots_on_per_90', label: 'SO90', title: 'Tiri in porta ogni 90 min' },
-    { sort: 'key_passes',    label: 'KP',  title: 'Passaggi chiave' },
-    { sort: 'tackles_total', label: 'Tk',  title: 'Contrasti' },
-    { sort: 'interceptions', label: 'In',  title: 'Intercettazioni' },
-    { sort: 'duels_won_pct', label: 'DW%', title: '% duelli vinti' },
-    { sort: 'dribbles_success_pct', label: 'DR%', title: '% dribbling riusciti' },
-    { sort: 'pass_accuracy', label: 'P%',  title: 'Precisione passaggi %' },
-    { sort: 'rating',        label: 'Rt',  title: 'Voto medio' },
-    { sort: 'yellow_cards',  label: 'Y',   title: 'Ammonizioni' },
-    { sort: 'red_cards',     label: 'R',   title: 'Espulsioni' }
-  ];
+  var ALL_COLS = {
+    api_player_id:      { label: 'ID',   title: 'API Player ID',           width: '4%'  },
+    name:               { label: 'Nome', title: 'Nome giocatore',          width: '14%', cls: 'col-name-h', cellCls: 'col-name' },
+    overall_score:      { label: 'Sc',   title: 'Punteggio complessivo',   width: '5%'  },
+    appearances:        { label: 'Pr',   title: 'Presenze',                width: '4%'  },
+    minutes:            { label: 'Min',  title: 'Minuti giocati',          width: '5%'  },
+    goals:              { label: 'G',    title: 'Gol',                     width: '3.5%' },
+    goals_per_90:       { label: 'G90',  title: 'Gol ogni 90 min',        width: '5%'  },
+    assists:            { label: 'A',    title: 'Assist',                  width: '3.5%' },
+    assists_per_90:     { label: 'A90',  title: 'Assist ogni 90 min',     width: '5%'  },
+    shots_total:        { label: 'ST',   title: 'Tiri totali',            width: '3.5%' },
+    shots_on:           { label: 'SO',   title: 'Tiri in porta',          width: '3.5%' },
+    shot_accuracy_pct:  { label: 'T%',   title: 'Precisione tiri %',      width: '5%'  },
+    key_passes:         { label: 'KP',   title: 'Passaggi chiave',        width: '4%'  },
+    tackles_total:      { label: 'Tk',   title: 'Contrasti',              width: '4%'  },
+    interceptions:      { label: 'In',   title: 'Intercettazioni',        width: '4%'  },
+    blocks:             { label: 'Bl',   title: 'Blocchi',                width: '4%'  },
+    duels_won_pct:      { label: 'DW%',  title: '% duelli vinti',         width: '5%'  },
+    dribbles_success_pct: { label: 'DR%', title: '% dribbling riusciti',  width: '5%'  },
+    pass_accuracy:      { label: 'P%',   title: 'Precisione passaggi %',  width: '5%'  },
+    rating:             { label: 'Rt',   title: 'Voto medio',             width: '5%'  },
+    yellow_cards:       { label: 'Y',    title: 'Ammonizioni',            width: '3.5%' },
+    red_cards:          { label: 'R',    title: 'Espulsioni',             width: '3.5%' },
+    saves:              { label: 'Sv',   title: 'Parate',                 width: '4%'  },
+    goals_conceded:     { label: 'GS',   title: 'Gol subiti',            width: '4%'  },
+    save_pct:           { label: 'SV%',  title: '% Parate',              width: '5.5%' },
+    clean_sheet_rate:   { label: 'CS%',  title: 'Clean Sheet %',         width: '5.5%' }
+  };
+
+  /* Colonne per ruolo (devono corrispondere alle chiavi di ALL_COLS) */
+  var ROLE_COLUMNS = {
+    Goalkeeper: [
+      'api_player_id','name','overall_score','appearances','minutes',
+      'save_pct','saves','goals_conceded','clean_sheet_rate',
+      'pass_accuracy','rating','yellow_cards','red_cards'
+    ],
+    Defender: [
+      'api_player_id','name','overall_score','appearances','minutes',
+      'tackles_total','interceptions','blocks','duels_won_pct',
+      'clean_sheet_rate','pass_accuracy','goals','assists','rating',
+      'yellow_cards','red_cards'
+    ],
+    Midfielder: [
+      'api_player_id','name','overall_score','appearances','minutes',
+      'goals','goals_per_90','assists','assists_per_90',
+      'key_passes','tackles_total','duels_won_pct','dribbles_success_pct',
+      'pass_accuracy','rating','yellow_cards','red_cards'
+    ],
+    Attacker: [
+      'api_player_id','name','overall_score','appearances','minutes',
+      'goals','goals_per_90','assists','assists_per_90',
+      'shots_total','shots_on','shot_accuracy_pct',
+      'key_passes','dribbles_success_pct','rating','yellow_cards','red_cards'
+    ]
+  };
+
+  /* Disclaimer per ruolo */
+  var ROLE_DISCLAIMERS = {
+    Goalkeeper: 'Score basato su: % Parate, Gol Subiti adj., Clean Sheet %, Rigori parati, Pass %, Rating, Minuti',
+    Defender: 'Score basato su: Contrasti, Intercettazioni, Blocchi, Duelli %, Clean Sheet %, Pass %, Gol, Rating, Minuti',
+    Midfielder: 'Score basato su: Pass chiave, Assist, Pass %, Contrasti, Duelli %, Gol, Rating, Minuti',
+    Attacker: 'Score basato su: Gol, Tiri in porta, Assist, Dribbling %, Pass chiave, Pass %, Rating, Minuti'
+  };
 
   /* ---------- Utilità ---------- */
 
@@ -324,32 +362,24 @@
     ROLE_GROUPS.forEach(function(g) { groups[g.key] = []; });
 
     filtered.forEach(function(p) {
-      var pos = p.position || '';
+      var pos = p.position || 'Midfielder';
       if (groups[pos]) {
         groups[pos].push(p);
       } else {
-        var found = false;
-        ROLE_GROUPS.forEach(function(g) {
-          if (!found && pos.toLowerCase().indexOf(g.key.toLowerCase()) >= 0) {
-            groups[g.key].push(p);
-            found = true;
-          }
-        });
-        if (!found) {
-          groups['Midfielder'].push(p);
-        }
+        groups['Midfielder'].push(p);
       }
     });
 
     ROLE_GROUPS.forEach(function(g) {
+      var state = sortStates[g.key] || { key: 'overall_score', dir: 'desc' };
       groups[g.key].sort(function(a, b) {
-        var va = a[sortKey], vb = b[sortKey];
+        var va = a[state.key], vb = b[state.key];
         if (va == null && vb == null) return 0;
         if (va == null) return 1;
         if (vb == null) return -1;
         if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb || '').toLowerCase(); }
-        if (va < vb) return sortDir === 'asc' ? -1 : 1;
-        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        if (va < vb) return state.dir === 'asc' ? -1 : 1;
+        if (va > vb) return state.dir === 'asc' ? 1 : -1;
         return 0;
       });
     });
@@ -357,51 +387,59 @@
     return groups;
   }
 
-  /* ---------- Costruzione HTML tabella ---------- */
+  /* ---------- Rendering cella per tipo ---------- */
 
-  function buildColgroup() {
-    return '<colgroup>' + COL_WIDTHS.map(function(w) {
+  var CELL_RENDER = {
+    api_player_id: function(p) {
+      var pid = p.api_player_id || p.player_id || 0;
+      var sn = getCurrentSeason();
+      return '<a href="/api/debug/player/' + pid + '/season/' + sn + '" class="player-id-link" title="API ID" onclick="event.stopPropagation()">' + pid + '</a>';
+    },
+    name: function(p) { return escapeHtml(p.name || '—'); },
+    overall_score: function(p) { return fsc(p.overall_score); },
+    goals_per_90: function(p) { return f2(p.goals_per_90); },
+    assists_per_90: function(p) { return f2(p.assists_per_90); },
+    shot_accuracy_pct: function(p) { return fp(p.shot_accuracy_pct); },
+    duels_won_pct: function(p) { return fp(p.duels_won_pct); },
+    dribbles_success_pct: function(p) { return fp(p.dribbles_success_pct); },
+    pass_accuracy: function(p) { return fp(p.pass_accuracy); },
+    rating: function(p) { return frt(p.rating); },
+    save_pct: function(p) { return fp(p.save_pct); },
+    clean_sheet_rate: function(p) { return fp(p.clean_sheet_rate); }
+  };
+
+  function renderCell(key, p) {
+    if (CELL_RENDER[key]) return CELL_RENDER[key](p);
+    return f0(p[key]);
+  }
+
+  /* ---------- Costruzione HTML tabella per ruolo ---------- */
+
+  function buildColgroup(cols) {
+    return '<colgroup>' + cols.map(function(key) {
+      var w = (ALL_COLS[key] && ALL_COLS[key].width) || '5%';
       return '<col style="width:' + w + '">';
     }).join('') + '</colgroup>';
   }
 
-  function buildThead() {
-    var ths = COL_HEADERS.map(function(h) {
-      var cls = 'sortable' + (h.cls ? ' ' + h.cls : '');
-      if (h.sort === sortKey) cls += sortDir === 'asc' ? ' sorted-asc' : ' sorted-desc';
-      return '<th class="' + cls + '" data-sort="' + h.sort + '" title="' + h.title + '">' + h.label + '</th>';
+  function buildThead(cols, role) {
+    var state = sortStates[role] || { key: 'overall_score', dir: 'desc' };
+    var ths = cols.map(function(key) {
+      var col = ALL_COLS[key] || {};
+      var cls = 'sortable' + (col.cls ? ' ' + col.cls : '');
+      if (key === state.key) cls += state.dir === 'asc' ? ' sorted-asc' : ' sorted-desc';
+      return '<th class="' + cls + '" data-sort="' + key + '" data-role="' + role + '" title="' + (col.title || key) + '">' + (col.label || key) + '</th>';
     }).join('');
     return '<thead><tr>' + ths + '</tr></thead>';
   }
 
-  function buildPlayerRow(p) {
-    var pid = p.api_player_id || p.player_id || 0;
-    var sn = getCurrentSeason();
-    return '<tr class="clickable" data-player-id="' + p.player_id + '">' +
-      '<td><a href="/api/debug/player/' + pid + '/season/' + sn + '" class="player-id-link" title="API ID" onclick="event.stopPropagation()">' + pid + '</a></td>' +
-      '<td class="col-name">' + escapeHtml(p.name || '—') + '</td>' +
-      '<td>' + fsc(p.overall_score) + '</td>' +
-      '<td>' + f0(p.appearances) + '</td>' +
-      '<td>' + f0(p.minutes) + '</td>' +
-      '<td>' + f0(p.goals) + '</td>' +
-      '<td>' + f2(p.goals_per_90) + '</td>' +
-      '<td>' + f0(p.assists) + '</td>' +
-      '<td>' + f2(p.assists_per_90) + '</td>' +
-      '<td>' + f0(p.shots_total) + '</td>' +
-      '<td>' + f0(p.shots_on) + '</td>' +
-      '<td>' + fp(p.shot_accuracy_pct) + '</td>' +
-      '<td>' + f2(p.shots_per_90) + '</td>' +
-      '<td>' + f2(p.shots_on_per_90) + '</td>' +
-      '<td>' + f0(p.key_passes) + '</td>' +
-      '<td>' + f0(p.tackles_total) + '</td>' +
-      '<td>' + f0(p.interceptions) + '</td>' +
-      '<td>' + fp(p.duels_won_pct) + '</td>' +
-      '<td>' + fp(p.dribbles_success_pct) + '</td>' +
-      '<td>' + fp(p.pass_accuracy) + '</td>' +
-      '<td>' + frt(p.rating) + '</td>' +
-      '<td>' + f0(p.yellow_cards) + '</td>' +
-      '<td>' + f0(p.red_cards) + '</td>' +
-      '</tr>';
+  function buildPlayerRow(p, cols) {
+    var cells = cols.map(function(key) {
+      var col = ALL_COLS[key] || {};
+      var cellCls = col.cellCls ? ' class="' + col.cellCls + '"' : '';
+      return '<td' + cellCls + '>' + renderCell(key, p) + '</td>';
+    }).join('');
+    return '<tr class="clickable" data-player-id="' + p.player_id + '">' + cells + '</tr>';
   }
 
   /* ---------- Render principale ---------- */
@@ -413,17 +451,22 @@
     ROLE_GROUPS.forEach(function(g) {
       var players = groups[g.key];
       if (!players || !players.length) return;
+      var cols = ROLE_COLUMNS[g.key] || ROLE_COLUMNS['Midfielder'];
+      var disclaimer = ROLE_DISCLAIMERS[g.key] || '';
 
       html += '<div class="role-header">' +
         '<span class="role-badge ' + g.css + '">' + g.label + '</span>' +
         '<span class="role-count">' + players.length + ' giocatori</span>' +
         '</div>';
+      if (disclaimer) {
+        html += '<div class="role-disclaimer">' + disclaimer + '</div>';
+      }
       html += '<div class="players-table-wrap">';
       html += '<table class="players-table" aria-label="' + g.label + '">';
-      html += buildColgroup();
-      html += buildThead();
+      html += buildColgroup(cols);
+      html += buildThead(cols, g.key);
       html += '<tbody>';
-      players.forEach(function(p) { html += buildPlayerRow(p); });
+      players.forEach(function(p) { html += buildPlayerRow(p, cols); });
       html += '</tbody></table></div>';
     });
 
@@ -436,12 +479,15 @@
     playersGroups.querySelectorAll('.players-table th.sortable').forEach(function(th) {
       th.addEventListener('click', function() {
         var key = th.getAttribute('data-sort');
-        if (key === sortKey) {
-          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        var role = th.getAttribute('data-role');
+        var state = sortStates[role] || { key: 'overall_score', dir: 'desc' };
+        if (key === state.key) {
+          state.dir = state.dir === 'asc' ? 'desc' : 'asc';
         } else {
-          sortKey = key;
-          sortDir = (key === 'name') ? 'asc' : 'desc';
+          state.key = key;
+          state.dir = (key === 'name') ? 'asc' : 'desc';
         }
+        sortStates[role] = state;
         renderPlayersTable();
       });
     });
