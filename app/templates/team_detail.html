@@ -113,7 +113,7 @@
 
 {% block content %}
 <div class="detail-card">
-  <a href="/teams" class="back-link">← Torna a Teams</a>
+  <a href="/teams" class="back-link">← Torna a Squadre</a>
   <div class="season-select-wrap">
     <label for="seasonSelect">Stagione</label>
     <select id="seasonSelect" aria-label="Stagione">
@@ -172,14 +172,14 @@
         <table class="players-table" aria-label="Rosa giocatori">
           <thead>
             <tr>
-              <th class="sortable" data-sort="name">Name</th>
+              <th class="sortable" data-sort="name">Nome</th>
               <th class="sortable" data-sort="position">Pos</th>
               <th class="sortable numeric" data-sort="minutes">Min</th>
               <th class="sortable numeric" data-sort="goals">G</th>
               <th class="sortable numeric" data-sort="assists">A</th>
-              <th class="sortable numeric" data-sort="shots">Shots</th>
-              <th class="sortable numeric" data-sort="pass_accuracy">Pass%</th>
-              <th class="sortable numeric" data-sort="rating">Rating</th>
+              <th class="sortable numeric" data-sort="shots">Tiri</th>
+              <th class="sortable numeric" data-sort="pass_accuracy">Prec. pass.</th>
+              <th class="sortable numeric" data-sort="rating">Voto</th>
             </tr>
           </thead>
           <tbody id="playersBody"></tbody>
@@ -230,18 +230,21 @@
   }
   function renderStatRows(stats) {
     if (!stats) return '';
-    return '<div class="stat-row"><span class="label">P</span><span>' + (stats.played ?? '—') + '</span></div>' +
-      '<div class="stat-row"><span class="label">W-D-L</span><span>' + (stats.wins ?? '—') + '-' + (stats.draws ?? '—') + '-' + (stats.losses ?? '—') + '</span></div>' +
-      '<div class="stat-row"><span class="label">GF / GA</span><span>' + (stats.goals_for ?? '—') + ' / ' + (stats.goals_against ?? '—') + '</span></div>' +
-      '<div class="stat-row"><span class="label">GD</span><span>' + (stats.goal_diff ?? '—') + '</span></div>' +
-      '<div class="stat-row"><span class="label">Pts</span><span>' + (stats.points ?? '—') + '</span></div>' +
-      '<div class="stat-row"><span class="label">Avg GF</span><span>' + (stats.avg_goals_for != null ? Number(stats.avg_goals_for).toFixed(2) : '—') + '</span></div>' +
-      '<div class="stat-row"><span class="label">Avg GA</span><span>' + (stats.avg_goals_against != null ? Number(stats.avg_goals_against).toFixed(2) : '—') + '</span></div>';
+    return '<div class="stat-row"><span class="label">G</span><span>' + (stats.played ?? '—') + '</span></div>' +
+      '<div class="stat-row"><span class="label">V-N-S</span><span>' + (stats.wins ?? '—') + '-' + (stats.draws ?? '—') + '-' + (stats.losses ?? '—') + '</span></div>' +
+      '<div class="stat-row"><span class="label">GF / GS</span><span>' + (stats.goals_for ?? '—') + ' / ' + (stats.goals_against ?? '—') + '</span></div>' +
+      '<div class="stat-row"><span class="label">DR</span><span>' + (stats.goal_diff ?? '—') + '</span></div>' +
+      '<div class="stat-row"><span class="label">Pt</span><span>' + (stats.points ?? '—') + '</span></div>' +
+      '<div class="stat-row"><span class="label">Media GF</span><span>' + (stats.avg_goals_for != null ? Number(stats.avg_goals_for).toFixed(2) : '—') + '</span></div>' +
+      '<div class="stat-row"><span class="label">Media GS</span><span>' + (stats.avg_goals_against != null ? Number(stats.avg_goals_against).toFixed(2) : '—') + '</span></div>';
   }
+  var resultLabelMap = { 'W': 'V', 'D': 'N', 'L': 'S' };
   function renderForm(formLast5) {
     if (!formLast5 || formLast5.length === 0) return '<span style="color:#888;">Nessuna partita</span>';
     return formLast5.map(function(m) {
-      return '<span class="form-badge ' + (m.result || 'D') + '" title="' + (m.goals_for ?? 0) + '-' + (m.goals_against ?? 0) + '">' + (m.result || 'D') + '</span>';
+      var r = m.result || 'D';
+      var label = resultLabelMap[r] || r;
+      return '<span class="form-badge ' + r + '" title="' + (m.goals_for ?? 0) + '-' + (m.goals_against ?? 0) + '">' + label + '</span>';
     }).join('');
   }
   function escapeHtml(s) {

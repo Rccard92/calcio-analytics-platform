@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Teams — Calcio Analytics{% endblock %}
+{% block title %}Squadre — Calcio Analytics{% endblock %}
 {% block main_class %}teams-page{% endblock %}
 {% block extra_css %}
 <style>
@@ -96,8 +96,8 @@
 
 {% block content %}
 <div class="teams-card">
-  <h1>Teams</h1>
-  <p class="sub">Classifica e statistiche per stagione (solo match conclusi)</p>
+  <h1>Squadre</h1>
+  <p class="sub">Classifica e statistiche per stagione (solo partite concluse)</p>
 
   <div class="teams-toolbar">
     <div class="select-wrap">
@@ -129,20 +129,20 @@
     <table class="teams-table" aria-label="Classifica squadre">
       <thead>
         <tr>
-          <th class="sortable" data-sort="team_name">Team <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="played">P <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="wins">W <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="draws">D <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="losses">L <span class="sort-icon"></span></th>
+          <th class="sortable" data-sort="team_name">Squadra <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="played">G <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="wins">V <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="draws">N <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="losses">S <span class="sort-icon"></span></th>
           <th class="sortable numeric" data-sort="goals_for">GF <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="goals_against">GA <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="goal_diff">GD <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="points">Pts <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="goals_against">GS <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="goal_diff">DR <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="points">Pt <span class="sort-icon"></span></th>
           <th class="sortable numeric" data-sort="clean_sheets">CS <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="btts_pct">BTTS% <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="btts_pct">GE% <span class="sort-icon"></span></th>
           <th class="sortable numeric" data-sort="over25_pct">O2.5% <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="avg_goals_for">Avg GF <span class="sort-icon"></span></th>
-          <th class="sortable numeric" data-sort="avg_goals_against">Avg GA <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="avg_goals_for">Media GF <span class="sort-icon"></span></th>
+          <th class="sortable numeric" data-sort="avg_goals_against">Media GS <span class="sort-icon"></span></th>
         </tr>
       </thead>
       <tbody id="teamsBody"></tbody>
