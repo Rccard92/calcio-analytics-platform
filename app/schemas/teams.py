@@ -86,3 +86,13 @@ class PlayerSeasonRow(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Player Ingestion Response ---
+
+
+class PlayerIngestionResponse(BaseModel):
+    """Risposta dell'endpoint POST ingest-players."""
+    team_id: int
+    season: int
+    players_ingested: int

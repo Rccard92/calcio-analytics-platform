@@ -83,6 +83,25 @@
   .detail-content { display: none; }
   .detail-content.visible { display: block; animation: fadeIn 0.3s ease; }
   .players-empty { padding: 24px; text-align: center; color: #888; font-size: 0.95rem; }
+  .btn-load-roster {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-top: 12px; padding: 10px 22px; border: none; border-radius: 12px;
+    background: #4a7c59; color: #e2e2e8; font-size: 0.9rem; font-weight: 600;
+    cursor: pointer; transition: background 0.2s, transform 0.1s;
+  }
+  .btn-load-roster:hover { background: #5a9a6a; transform: translateY(-1px); }
+  .btn-load-roster:active { transform: translateY(0); }
+  .btn-load-roster:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .btn-load-roster .spinner-sm {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+    border-radius: 50%; animation: spin 0.7s linear infinite; display: none;
+  }
+  .btn-load-roster.loading .spinner-sm { display: inline-block; }
+  .ingest-result {
+    margin-top: 10px; padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; display: none;
+  }
+  .ingest-result.success { display: block; background: #1e3a28; color: #6ee7a0; border: 1px solid #4a7c59; }
+  .ingest-result.error { display: block; background: #3a1e1e; color: #f08a8a; border: 1px solid #c55; }
   .season-select-wrap { margin-bottom: 16px; }
   .season-select-wrap label { display: block; color: #888; font-size: 0.85rem; margin-bottom: 6px; }
   .season-select-wrap select {
@@ -140,7 +159,15 @@
         <div class="spinner"></div>
         <span>Caricamento rosa…</span>
       </div>
-      <div id="playersEmpty" class="players-empty" style="display: none;">Nessun giocatore in rosa per questa stagione.</div>
+      <div id="playersEmpty" class="players-empty" style="display: none;">
+        Nessun giocatore in rosa per questa stagione.
+        <br>
+        <button id="btnLoadRoster" class="btn-load-roster" type="button">
+          <span class="spinner-sm"></span>
+          Carica rosa
+        </button>
+        <div id="ingestResult" class="ingest-result"></div>
+      </div>
       <div id="playersTableWrap" class="players-table-wrap" style="display: none;">
         <table class="players-table" aria-label="Rosa giocatori">
           <thead>
@@ -189,6 +216,8 @@
   const playersEmpty = document.getElementById('playersEmpty');
   const playersTableWrap = document.getElementById('playersTableWrap');
   const playersBody = document.getElementById('playersBody');
+  const btnLoadRoster = document.getElementById('btnLoadRoster');
+  const ingestResult = document.getElementById('ingestResult');
 
   let detailData = null;
   let allPlayers = [];
@@ -326,6 +355,41 @@
     var playerId = tr.getAttribute('data-player-id');
     if (playerId) console.log('Player click (dettaglio futuro):', playerId);
   });
+
+  function getCurrentSeason() {
+    return parseInt(seasonSelect.value, 10) || initialSeason;
+  }
+
+  function ingestPlayers() {
+    var season = getCurrentSeason();
+    btnLoadRoster.disabled = true;
+    btnLoadRoster.classList.add('loading');
+    ingestResult.className = 'ingest-result';
+    ingestResult.style.display = 'none';
+
+    fetch('/api/teams/' + teamId + '/season/' + season + '/ingest-players', { method: 'POST' })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(err) { throw new Error(err.detail || 'Errore ' + r.status); });
+        return r.json();
+      })
+      .then(function(data) {
+        btnLoadRoster.disabled = false;
+        btnLoadRoster.classList.remove('loading');
+        ingestResult.className = 'ingest-result success';
+        ingestResult.textContent = 'Caricati ' + data.players_ingested + ' giocatori.';
+        if (data.players_ingested > 0) {
+          setTimeout(function() { loadPlayers(season); }, 600);
+        }
+      })
+      .catch(function(e) {
+        btnLoadRoster.disabled = false;
+        btnLoadRoster.classList.remove('loading');
+        ingestResult.className = 'ingest-result error';
+        ingestResult.textContent = 'Errore: ' + (e.message || 'Errore di rete.');
+      });
+  }
+
+  btnLoadRoster.addEventListener('click', ingestPlayers);
 
   (function init() {
     fetch('/leagues/seasons').then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {

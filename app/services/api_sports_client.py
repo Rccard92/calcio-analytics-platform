@@ -110,6 +110,52 @@ class ApiSportsClient:
         logger.info("get_fixture_statistics fixture=%s -> %s teams", fixture_id, len(response))
         return response
 
+    async def get_team_players(self, team_id: int, season: int) -> list[dict[str, Any]]:
+        """
+        Ritorna tutti i giocatori di una squadra per una stagione.
+        Gestisce la paginazione automaticamente (l'endpoint /players è paginato).
+        Logga gli header di rate limit.
+        """
+        all_players: list[dict[str, Any]] = []
+        page = 1
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            while True:
+                r = await client.get(
+                    f"{BASE_URL}/players",
+                    params={"team": team_id, "season": season, "page": page},
+                    headers=self._headers(),
+                )
+                r.raise_for_status()
+
+                remaining = _get_header(r.headers, "x-ratelimit-remaining", "x-ratelimit-remaining-minute")
+                logger.info(
+                    "get_team_players team=%s season=%s page=%s — rate limit remaining: %s",
+                    team_id, season, page, remaining,
+                )
+
+                data = r.json()
+                errors = data.get("errors", {})
+                if errors:
+                    logger.warning("API-Sports errors (players): %s", errors)
+                    break
+
+                response = data.get("response", [])
+                all_players.extend(response)
+
+                paging = data.get("paging", {})
+                current_page = paging.get("current", page)
+                total_pages = paging.get("total", page)
+                if current_page >= total_pages:
+                    break
+                page += 1
+
+        logger.info(
+            "get_team_players team=%s season=%s -> %s giocatori totali (%s pagine)",
+            team_id, season, len(all_players), page,
+        )
+        return all_players
+
     async def test_connection(self) -> dict[str, Any]:
         """
         Test connessione leggero: chiama /status (non consuma quota giornaliera).
