@@ -3,7 +3,6 @@
 {% block main_class %}teams-page{% endblock %}
 {% block extra_css %}
 <style>
-  /* Override base.html: full-width per il dettaglio squadra */
   main.teams-page { max-width: 100%; padding: 16px 10px; }
 
   .detail-card {
@@ -23,17 +22,11 @@
   .detail-card .back-link { color: #6ee7a0; text-decoration: none; font-size: 0.85rem; margin-bottom: 12px; display: inline-block; }
   .detail-card .back-link:hover { text-decoration: underline; }
   .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    margin-bottom: 22px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px;
   }
   @media (max-width: 720px) { .stats-grid { grid-template-columns: 1fr; } }
   .stat-box {
-    background: #1e1e28;
-    border-radius: 12px;
-    padding: 16px;
-    border: 1px solid #2a2a36;
+    background: #1e1e28; border-radius: 12px; padding: 16px; border: 1px solid #2a2a36;
   }
   .stat-box h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #aaa; font-weight: 600; }
   .stat-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85rem; }
@@ -43,7 +36,7 @@
   .form-badges { display: flex; gap: 8px; flex-wrap: wrap; }
   .form-badge {
     width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 0.9rem; color: #1a1a24;
+    font-weight: 700; font-size: 0.9rem;
   }
   .form-badge.W { background: #4a7c59; color: #e2e2e8; }
   .form-badge.D { background: #e7c66e; color: #1a1a24; }
@@ -56,35 +49,37 @@
   }
   .players-toolbar .search-input:focus { outline: none; border-color: #4a7c59; }
 
-  /* --- Tabella compatta full-width --- */
+  /* --- Badge ruolo --- */
+  .role-header {
+    display: flex; align-items: center; gap: 8px;
+    margin: 18px 0 6px 0;
+  }
+  .role-header:first-child { margin-top: 0; }
+  .role-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 6px;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  }
+  .role-badge.gk  { background: #2a3f5f; color: #6eb4f7; }
+  .role-badge.def { background: #1e3a28; color: #6ee7a0; }
+  .role-badge.mid { background: #352a4a; color: #b68af7; }
+  .role-badge.att { background: #4a2020; color: #f28a8a; }
+  .role-count { font-size: 0.75rem; color: #666; }
+
+  /* --- Tabella compatta --- */
   .players-table-wrap {
-    overflow-x: hidden;
-    border-radius: 10px;
-    border: 1px solid #2a2a36;
-    margin-bottom: 20px;
+    overflow-x: hidden; border-radius: 10px; border: 1px solid #2a2a36; margin-bottom: 14px;
   }
   .players-table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-    font-size: 0.74rem;
+    width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.74rem;
   }
   .players-table th,
   .players-table td {
-    padding: 4px 3px;
-    text-align: center;
-    border-bottom: 1px solid #2a2a36;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding: 4px 3px; text-align: center; border-bottom: 1px solid #2a2a36;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .players-table th {
-    background: #1e1e28;
-    color: #888;
-    font-weight: 600;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    background: #1e1e28; color: #888; font-weight: 600; font-size: 0.68rem;
+    text-transform: uppercase; letter-spacing: 0.02em;
   }
   .players-table th.sortable { cursor: pointer; user-select: none; }
   .players-table th.sortable:hover { color: #e2e2e8; }
@@ -92,14 +87,12 @@
   .players-table th.sorted-desc::after { content: '▼'; font-size: 0.55rem; margin-left: 1px; opacity: 0.8; }
   .players-table td { color: #d0d0d8; }
   .players-table td.col-name { text-align: left; font-weight: 500; color: #e2e2e8; }
-  .players-table td.col-pos  { font-size: 0.68rem; color: #999; }
   .players-table th.col-name-h { text-align: left; }
   .players-table tbody tr.clickable { cursor: pointer; transition: background 0.15s; }
   .players-table tbody tr.clickable:hover { background: #2a2a36; }
   .player-id-link { color: #6a6a7a; font-size: 0.68rem; font-family: monospace; text-decoration: none; }
   .player-id-link:hover { color: #6ee7a0; text-decoration: underline; }
 
-  /* Score badge */
   .sc-h { color: #6ee7a0; font-weight: 700; }
   .sc-m { color: #e7c66e; font-weight: 700; }
   .sc-l { color: #f08a8a; font-weight: 600; }
@@ -168,18 +161,9 @@
 
   <div id="detailContent" class="detail-content">
     <div class="stats-grid">
-      <div class="stat-box">
-        <h3>Stagione</h3>
-        <div id="seasonStats"></div>
-      </div>
-      <div class="stat-box">
-        <h3>Casa</h3>
-        <div id="homeStats"></div>
-      </div>
-      <div class="stat-box">
-        <h3>Trasferta</h3>
-        <div id="awayStats"></div>
-      </div>
+      <div class="stat-box"><h3>Stagione</h3><div id="seasonStats"></div></div>
+      <div class="stat-box"><h3>Casa</h3><div id="homeStats"></div></div>
+      <div class="stat-box"><h3>Trasferta</h3><div id="awayStats"></div></div>
     </div>
 
     <div class="form-section">
@@ -205,65 +189,7 @@
         </button>
         <div id="ingestResult" class="ingest-result"></div>
       </div>
-      <div id="playersTableWrap" class="players-table-wrap" style="display: none;">
-        <table class="players-table" aria-label="Rosa giocatori">
-          <colgroup>
-            <col style="width:3.2%">
-            <col style="width:11%">
-            <col style="width:3.2%">
-            <col style="width:4%">
-            <col style="width:3%">
-            <col style="width:4%">
-            <col style="width:2.8%">
-            <col style="width:4%">
-            <col style="width:2.8%">
-            <col style="width:4%">
-            <col style="width:3%">
-            <col style="width:3%">
-            <col style="width:4%">
-            <col style="width:4%">
-            <col style="width:4.2%">
-            <col style="width:3%">
-            <col style="width:3.2%">
-            <col style="width:3%">
-            <col style="width:4.2%">
-            <col style="width:4.2%">
-            <col style="width:4%">
-            <col style="width:4%">
-            <col style="width:3.2%">
-            <col style="width:3%">
-          </colgroup>
-          <thead>
-            <tr>
-              <th class="sortable" data-sort="api_player_id" title="API Player ID">ID</th>
-              <th class="sortable col-name-h" data-sort="name" title="Nome giocatore">Nome</th>
-              <th class="sortable" data-sort="position" title="Posizione">Pos</th>
-              <th class="sortable" data-sort="overall_score" title="Punteggio complessivo">Sc</th>
-              <th class="sortable" data-sort="appearances" title="Presenze">Pr</th>
-              <th class="sortable" data-sort="minutes" title="Minuti giocati">Min</th>
-              <th class="sortable" data-sort="goals" title="Gol">G</th>
-              <th class="sortable" data-sort="goals_per_90" title="Gol ogni 90 minuti">G90</th>
-              <th class="sortable" data-sort="assists" title="Assist">A</th>
-              <th class="sortable" data-sort="assists_per_90" title="Assist ogni 90 minuti">A90</th>
-              <th class="sortable" data-sort="shots_total" title="Tiri totali">ST</th>
-              <th class="sortable" data-sort="shots_on" title="Tiri in porta">SO</th>
-              <th class="sortable" data-sort="shot_accuracy_pct" title="Precisione tiri %">T%</th>
-              <th class="sortable" data-sort="shots_per_90" title="Tiri ogni 90 min">T90</th>
-              <th class="sortable" data-sort="shots_on_per_90" title="Tiri in porta ogni 90 min">SO90</th>
-              <th class="sortable" data-sort="key_passes" title="Passaggi chiave">KP</th>
-              <th class="sortable" data-sort="tackles_total" title="Contrasti">Tk</th>
-              <th class="sortable" data-sort="interceptions" title="Intercettazioni">In</th>
-              <th class="sortable" data-sort="duels_won_pct" title="% duelli vinti">DW%</th>
-              <th class="sortable" data-sort="dribbles_success_pct" title="% dribbling riusciti">DR%</th>
-              <th class="sortable" data-sort="pass_accuracy" title="Precisione passaggi %">P%</th>
-              <th class="sortable" data-sort="rating" title="Voto medio">Rt</th>
-              <th class="sortable" data-sort="yellow_cards" title="Ammonizioni">Y</th>
-              <th class="sortable" data-sort="red_cards" title="Espulsioni">R</th>
-            </tr>
-          </thead>
-          <tbody id="playersBody"></tbody>
-        </table>
-      </div>
+      <div id="playersGroups" style="display: none;"></div>
     </div>
   </div>
 </div>
@@ -293,19 +219,63 @@
   var playerSearch = document.getElementById('playerSearch');
   var playersLoading = document.getElementById('playersLoading');
   var playersEmpty = document.getElementById('playersEmpty');
-  var playersTableWrap = document.getElementById('playersTableWrap');
-  var playersBody = document.getElementById('playersBody');
+  var playersGroups = document.getElementById('playersGroups');
   var btnLoadRoster = document.getElementById('btnLoadRoster');
   var ingestResult = document.getElementById('ingestResult');
 
-  var detailData = null;
   var allPlayers = [];
   var sortKey = 'overall_score';
   var sortDir = 'desc';
 
+  /* ---------- Configurazione gruppi ruolo ---------- */
+
+  var ROLE_GROUPS = [
+    { key: 'Goalkeeper',  label: 'Portieri',       css: 'gk'  },
+    { key: 'Defender',    label: 'Difensori',      css: 'def' },
+    { key: 'Midfielder',  label: 'Centrocampisti', css: 'mid' },
+    { key: 'Attacker',    label: 'Attaccanti',     css: 'att' }
+  ];
+
+  var COL_WIDTHS = [
+    '3.2%','11%','4%','3%','4%','2.8%','4%','2.8%','4%',
+    '3%','3%','4%','4%','4.2%','3%','3.2%','3%','4.2%','4.2%','4%','4%','3.2%','3%'
+  ];
+
+  var COL_HEADERS = [
+    { sort: 'api_player_id', label: 'ID',  title: 'API Player ID' },
+    { sort: 'name',          label: 'Nome', title: 'Nome giocatore', cls: 'col-name-h' },
+    { sort: 'overall_score', label: 'Sc',  title: 'Punteggio complessivo' },
+    { sort: 'appearances',   label: 'Pr',  title: 'Presenze' },
+    { sort: 'minutes',       label: 'Min', title: 'Minuti giocati' },
+    { sort: 'goals',         label: 'G',   title: 'Gol' },
+    { sort: 'goals_per_90',  label: 'G90', title: 'Gol ogni 90 minuti' },
+    { sort: 'assists',       label: 'A',   title: 'Assist' },
+    { sort: 'assists_per_90',label: 'A90', title: 'Assist ogni 90 minuti' },
+    { sort: 'shots_total',   label: 'ST',  title: 'Tiri totali' },
+    { sort: 'shots_on',      label: 'SO',  title: 'Tiri in porta' },
+    { sort: 'shot_accuracy_pct', label: 'T%',  title: 'Precisione tiri %' },
+    { sort: 'shots_per_90',  label: 'T90', title: 'Tiri ogni 90 min' },
+    { sort: 'shots_on_per_90', label: 'SO90', title: 'Tiri in porta ogni 90 min' },
+    { sort: 'key_passes',    label: 'KP',  title: 'Passaggi chiave' },
+    { sort: 'tackles_total', label: 'Tk',  title: 'Contrasti' },
+    { sort: 'interceptions', label: 'In',  title: 'Intercettazioni' },
+    { sort: 'duels_won_pct', label: 'DW%', title: '% duelli vinti' },
+    { sort: 'dribbles_success_pct', label: 'DR%', title: '% dribbling riusciti' },
+    { sort: 'pass_accuracy', label: 'P%',  title: 'Precisione passaggi %' },
+    { sort: 'rating',        label: 'Rt',  title: 'Voto medio' },
+    { sort: 'yellow_cards',  label: 'Y',   title: 'Ammonizioni' },
+    { sort: 'red_cards',     label: 'R',   title: 'Espulsioni' }
+  ];
+
+  /* ---------- Utilità ---------- */
+
   function setError(msg) {
     detailError.textContent = msg || '';
     detailError.classList.toggle('visible', !!msg);
+  }
+  function escapeHtml(s) {
+    if (s == null) return '';
+    var d = document.createElement('div'); d.textContent = s; return d.innerHTML;
   }
 
   function renderStatRows(stats) {
@@ -320,23 +290,15 @@
   }
 
   var resultLabelMap = { 'W': 'V', 'D': 'N', 'L': 'S' };
-  function renderForm(formLast5) {
-    if (!formLast5 || formLast5.length === 0) return '<span style="color:#888;">Nessuna partita</span>';
-    return formLast5.map(function(m) {
+  function renderForm(arr) {
+    if (!arr || !arr.length) return '<span style="color:#888;">Nessuna partita</span>';
+    return arr.map(function(m) {
       var r = m.result || 'D';
-      var label = resultLabelMap[r] || r;
-      return '<span class="form-badge ' + r + '" title="' + (m.goals_for ?? 0) + '-' + (m.goals_against ?? 0) + '">' + label + '</span>';
+      return '<span class="form-badge ' + r + '" title="' + (m.goals_for ?? 0) + '-' + (m.goals_against ?? 0) + '">' + (resultLabelMap[r] || r) + '</span>';
     }).join('');
   }
 
-  function escapeHtml(s) {
-    if (s == null) return '';
-    var div = document.createElement('div');
-    div.textContent = s;
-    return div.innerHTML;
-  }
-
-  /* ---------- Formattatori compatti ---------- */
+  /* ---------- Formattatori ---------- */
 
   function f0(v) { return v == null ? '—' : String(v); }
   function f2(v) { return v == null ? '<span class="v90">—</span>' : '<span class="v90">' + Number(v).toFixed(2) + '</span>'; }
@@ -348,67 +310,150 @@
   }
   function frt(v) { return (v == null || v === 0) ? '—' : Number(v).toFixed(2); }
 
-  /* ---------- Sorting ---------- */
+  /* ---------- Grouping + Sorting ---------- */
 
   function getSearchTerm() { return (playerSearch.value || '').trim().toLowerCase(); }
 
-  function filteredAndSortedPlayers() {
+  function groupPlayers() {
     var q = getSearchTerm();
-    var list = q ? allPlayers.filter(function(p) { return (p.name || '').toLowerCase().indexOf(q) >= 0; }) : allPlayers.slice();
-    list.sort(function(a, b) {
-      var va = a[sortKey], vb = b[sortKey];
-      if (va == null && vb == null) return 0;
-      if (va == null) return 1;
-      if (vb == null) return -1;
-      if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb || '').toLowerCase(); }
-      if (va < vb) return sortDir === 'asc' ? -1 : 1;
-      if (va > vb) return sortDir === 'asc' ? 1 : -1;
-      return 0;
+    var filtered = q
+      ? allPlayers.filter(function(p) { return (p.name || '').toLowerCase().indexOf(q) >= 0; })
+      : allPlayers;
+
+    var groups = {};
+    ROLE_GROUPS.forEach(function(g) { groups[g.key] = []; });
+
+    filtered.forEach(function(p) {
+      var pos = p.position || '';
+      if (groups[pos]) {
+        groups[pos].push(p);
+      } else {
+        var found = false;
+        ROLE_GROUPS.forEach(function(g) {
+          if (!found && pos.toLowerCase().indexOf(g.key.toLowerCase()) >= 0) {
+            groups[g.key].push(p);
+            found = true;
+          }
+        });
+        if (!found) {
+          groups['Midfielder'].push(p);
+        }
+      }
     });
-    return list;
+
+    ROLE_GROUPS.forEach(function(g) {
+      groups[g.key].sort(function(a, b) {
+        var va = a[sortKey], vb = b[sortKey];
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb || '').toLowerCase(); }
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    });
+
+    return groups;
   }
 
-  /* ---------- Render tabella ---------- */
+  /* ---------- Costruzione HTML tabella ---------- */
+
+  function buildColgroup() {
+    return '<colgroup>' + COL_WIDTHS.map(function(w) {
+      return '<col style="width:' + w + '">';
+    }).join('') + '</colgroup>';
+  }
+
+  function buildThead() {
+    var ths = COL_HEADERS.map(function(h) {
+      var cls = 'sortable' + (h.cls ? ' ' + h.cls : '');
+      if (h.sort === sortKey) cls += sortDir === 'asc' ? ' sorted-asc' : ' sorted-desc';
+      return '<th class="' + cls + '" data-sort="' + h.sort + '" title="' + h.title + '">' + h.label + '</th>';
+    }).join('');
+    return '<thead><tr>' + ths + '</tr></thead>';
+  }
+
+  function buildPlayerRow(p) {
+    var pid = p.api_player_id || p.player_id || 0;
+    var sn = getCurrentSeason();
+    return '<tr class="clickable" data-player-id="' + p.player_id + '">' +
+      '<td><a href="/api/debug/player/' + pid + '/season/' + sn + '" class="player-id-link" title="API ID" onclick="event.stopPropagation()">' + pid + '</a></td>' +
+      '<td class="col-name">' + escapeHtml(p.name || '—') + '</td>' +
+      '<td>' + fsc(p.overall_score) + '</td>' +
+      '<td>' + f0(p.appearances) + '</td>' +
+      '<td>' + f0(p.minutes) + '</td>' +
+      '<td>' + f0(p.goals) + '</td>' +
+      '<td>' + f2(p.goals_per_90) + '</td>' +
+      '<td>' + f0(p.assists) + '</td>' +
+      '<td>' + f2(p.assists_per_90) + '</td>' +
+      '<td>' + f0(p.shots_total) + '</td>' +
+      '<td>' + f0(p.shots_on) + '</td>' +
+      '<td>' + fp(p.shot_accuracy_pct) + '</td>' +
+      '<td>' + f2(p.shots_per_90) + '</td>' +
+      '<td>' + f2(p.shots_on_per_90) + '</td>' +
+      '<td>' + f0(p.key_passes) + '</td>' +
+      '<td>' + f0(p.tackles_total) + '</td>' +
+      '<td>' + f0(p.interceptions) + '</td>' +
+      '<td>' + fp(p.duels_won_pct) + '</td>' +
+      '<td>' + fp(p.dribbles_success_pct) + '</td>' +
+      '<td>' + fp(p.pass_accuracy) + '</td>' +
+      '<td>' + frt(p.rating) + '</td>' +
+      '<td>' + f0(p.yellow_cards) + '</td>' +
+      '<td>' + f0(p.red_cards) + '</td>' +
+      '</tr>';
+  }
+
+  /* ---------- Render principale ---------- */
 
   function renderPlayersTable() {
-    var rows = filteredAndSortedPlayers();
-    playersBody.innerHTML = '';
-    rows.forEach(function(p) {
-      var tr = document.createElement('tr');
-      tr.className = 'clickable';
-      tr.setAttribute('data-player-id', p.player_id);
-      var pid = p.api_player_id || p.player_id || 0;
-      var sn = getCurrentSeason();
-      tr.innerHTML =
-        '<td><a href="/api/debug/player/' + pid + '/season/' + sn + '" class="player-id-link" title="API ID" onclick="event.stopPropagation()">' + pid + '</a></td>' +
-        '<td class="col-name">' + escapeHtml(p.name || '—') + '</td>' +
-        '<td class="col-pos">' + escapeHtml((p.position || '—').substring(0, 3)) + '</td>' +
-        '<td>' + fsc(p.overall_score) + '</td>' +
-        '<td>' + f0(p.appearances) + '</td>' +
-        '<td>' + f0(p.minutes) + '</td>' +
-        '<td>' + f0(p.goals) + '</td>' +
-        '<td>' + f2(p.goals_per_90) + '</td>' +
-        '<td>' + f0(p.assists) + '</td>' +
-        '<td>' + f2(p.assists_per_90) + '</td>' +
-        '<td>' + f0(p.shots_total) + '</td>' +
-        '<td>' + f0(p.shots_on) + '</td>' +
-        '<td>' + fp(p.shot_accuracy_pct) + '</td>' +
-        '<td>' + f2(p.shots_per_90) + '</td>' +
-        '<td>' + f2(p.shots_on_per_90) + '</td>' +
-        '<td>' + f0(p.key_passes) + '</td>' +
-        '<td>' + f0(p.tackles_total) + '</td>' +
-        '<td>' + f0(p.interceptions) + '</td>' +
-        '<td>' + fp(p.duels_won_pct) + '</td>' +
-        '<td>' + fp(p.dribbles_success_pct) + '</td>' +
-        '<td>' + fp(p.pass_accuracy) + '</td>' +
-        '<td>' + frt(p.rating) + '</td>' +
-        '<td>' + f0(p.yellow_cards) + '</td>' +
-        '<td>' + f0(p.red_cards) + '</td>';
-      playersBody.appendChild(tr);
+    var groups = groupPlayers();
+    var html = '';
+
+    ROLE_GROUPS.forEach(function(g) {
+      var players = groups[g.key];
+      if (!players || !players.length) return;
+
+      html += '<div class="role-header">' +
+        '<span class="role-badge ' + g.css + '">' + g.label + '</span>' +
+        '<span class="role-count">' + players.length + ' giocatori</span>' +
+        '</div>';
+      html += '<div class="players-table-wrap">';
+      html += '<table class="players-table" aria-label="' + g.label + '">';
+      html += buildColgroup();
+      html += buildThead();
+      html += '<tbody>';
+      players.forEach(function(p) { html += buildPlayerRow(p); });
+      html += '</tbody></table></div>';
     });
-    document.querySelectorAll('.players-table th.sortable').forEach(function(th) {
-      th.classList.remove('sorted-asc', 'sorted-desc');
-      if (th.getAttribute('data-sort') === sortKey) th.classList.add(sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+
+    playersGroups.innerHTML = html;
+    attachSortHandlers();
+    attachRowClickHandlers();
+  }
+
+  function attachSortHandlers() {
+    playersGroups.querySelectorAll('.players-table th.sortable').forEach(function(th) {
+      th.addEventListener('click', function() {
+        var key = th.getAttribute('data-sort');
+        if (key === sortKey) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortKey = key;
+          sortDir = (key === 'name') ? 'asc' : 'desc';
+        }
+        renderPlayersTable();
+      });
+    });
+  }
+
+  function attachRowClickHandlers() {
+    playersGroups.querySelectorAll('tr.clickable').forEach(function(tr) {
+      tr.addEventListener('click', function(e) {
+        if (e.target.closest('a')) return;
+        var id = tr.getAttribute('data-player-id');
+        if (id) console.log('Player click (dettaglio futuro):', id);
+      });
     });
   }
 
@@ -424,7 +469,6 @@
         return r.json();
       })
       .then(function(data) {
-        detailData = data;
         detailLoading.style.display = 'none';
         detailContent.classList.add('visible');
         teamNameEl.textContent = (data.team && data.team.team_name) ? data.team.team_name : '—';
@@ -444,7 +488,7 @@
   function loadPlayers(season) {
     playersLoading.style.display = 'flex';
     playersEmpty.style.display = 'none';
-    playersTableWrap.style.display = 'none';
+    playersGroups.style.display = 'none';
     fetch('/api/teams/' + teamId + '/season/' + season + '/players')
       .then(function(r) { return r.ok ? r.json() : []; })
       .then(function(list) {
@@ -453,7 +497,7 @@
         if (allPlayers.length === 0) {
           playersEmpty.style.display = 'block';
         } else {
-          playersTableWrap.style.display = 'block';
+          playersGroups.style.display = 'block';
           renderPlayersTable();
         }
       })
@@ -470,26 +514,8 @@
     if (!isNaN(s)) window.location.href = '/teams/' + teamId + '?season=' + s;
   });
 
-  playerSearch.addEventListener('input', function() { if (allPlayers.length) renderPlayersTable(); });
-
-  document.querySelectorAll('.players-table th.sortable').forEach(function(th) {
-    th.addEventListener('click', function() {
-      var key = th.getAttribute('data-sort');
-      if (key === sortKey) {
-        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-      } else {
-        sortKey = key;
-        sortDir = (key === 'name' || key === 'position') ? 'asc' : 'desc';
-      }
-      renderPlayersTable();
-    });
-  });
-
-  playersBody.addEventListener('click', function(e) {
-    var tr = e.target.closest('tr.clickable');
-    if (!tr) return;
-    var playerId = tr.getAttribute('data-player-id');
-    if (playerId) console.log('Player click (dettaglio futuro):', playerId);
+  playerSearch.addEventListener('input', function() {
+    if (allPlayers.length) renderPlayersTable();
   });
 
   function getCurrentSeason() { return parseInt(seasonSelect.value, 10) || initialSeason; }
