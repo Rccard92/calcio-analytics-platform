@@ -283,7 +283,7 @@
       tr.setAttribute('data-player-id', p.player_id);
       var pidVal = p.api_player_id || p.player_id || 0;
       var seasonVal = getCurrentSeason();
-      tr.innerHTML = '<td class="numeric"><a href="/debug/player/' + pidVal + '?season=' + seasonVal + '" class="player-id-link" title="API Player ID" onclick="event.stopPropagation()">' + pidVal + '</a></td>' +
+      tr.innerHTML = '<td class="numeric"><a href="/api/debug/player/' + pidVal + '/season/' + seasonVal + '" class="player-id-link" title="API Player ID" onclick="event.stopPropagation()">' + pidVal + '</a></td>' +
         '<td>' + escapeHtml(p.name || '—') + '</td>' +
         '<td>' + escapeHtml(p.position || '—') + '</td>' +
         '<td class="numeric">' + (p.appearances ?? '—') + '</td>' +

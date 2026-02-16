@@ -2,7 +2,8 @@
 Servizio di ingestion rosa giocatori per squadra e stagione.
 Chiama API-Sports /players, upsert in players e player_season_stats.
 Estrae TUTTE le statistiche disponibili da API-Football v3.
-Separato dall'ingestion fixture per non interferire con il flusso esistente.
+Gestisce correttamente giocatori con statistiche multi-competizione
+selezionando la entry giusta (Serie A / league principale).
 """
 
 import logging
@@ -14,6 +15,8 @@ from app.models import Player, PlayerSeasonStats
 from app.services.api_sports_client import ApiSportsClient
 
 logger = logging.getLogger(__name__)
+
+SERIE_A_LEAGUE_ID = 135
 
 STATS_DB_FIELDS = [
     "appearances",
@@ -51,7 +54,6 @@ STATS_DB_FIELDS = [
 
 
 def _safe_int(value: Any) -> int | None:
-    """Converte un valore in int; ritorna None se impossibile o None."""
     if value is None:
         return None
     try:
@@ -61,7 +63,6 @@ def _safe_int(value: Any) -> int | None:
 
 
 def _safe_float(value: Any) -> float | None:
-    """Converte un valore in float; ritorna None se impossibile o None."""
     if value is None:
         return None
     try:
@@ -71,7 +72,6 @@ def _safe_float(value: Any) -> float | None:
 
 
 def _safe_bool(value: Any) -> bool | None:
-    """Converte un valore in bool; ritorna None se impossibile."""
     if value is None:
         return None
     if isinstance(value, bool):
@@ -84,40 +84,62 @@ def _safe_bool(value: Any) -> bool | None:
         return None
 
 
-def _extract_player_data(item: dict[str, Any]) -> dict[str, Any] | None:
+def _pick_best_stat(statistics_list: list[dict], team_id: int, season: int) -> dict:
     """
-    Estrae dati anagrafici e TUTTE le statistiche da un elemento della response
-    API-Sports /players. Ogni elemento ha struttura:
-        { player: {...}, statistics: [{games, shots, goals, passes, ...}] }
-    Ritorna None se mancano dati essenziali (api_player_id, name).
-    Ogni accesso nested usa .get() con fallback — mai KeyError/TypeError.
+    Seleziona la statistica migliore dall'array statistics[] di API-Football.
+
+    Un giocatore può avere più entries: una per Serie A, una per Champions, ecc.
+    Priorità:
+      1. Stessa squadra + Serie A (league 135)
+      2. Stessa squadra + stagione corretta + maggior numero di presenze
+      3. Prima entry disponibile come fallback
     """
-    player_info = item.get("player") or {}
-    api_player_id = player_info.get("id")
-    if not api_player_id:
-        return None
-
-    name = player_info.get("name") or ""
-    if not name:
-        firstname = player_info.get("firstname") or ""
-        lastname = player_info.get("lastname") or ""
-        name = f"{firstname} {lastname}".strip()
-    if not name:
-        return None
-
-    statistics_list = item.get("statistics") or []
     if not statistics_list:
-        return {
-            "api_player_id": int(api_player_id),
-            "name": name,
-            "age": player_info.get("age"),
-            "nationality": player_info.get("nationality"),
-            "position": player_info.get("position"),
-            **{field: None for field in STATS_DB_FIELDS},
-        }
+        return {}
 
-    stats = statistics_list[0] if isinstance(statistics_list[0], dict) else {}
+    candidates = []
+    for stat in statistics_list:
+        if not isinstance(stat, dict):
+            continue
 
+        stat_team = (stat.get("team") or {})
+        stat_league = (stat.get("league") or {})
+        stat_team_id = stat_team.get("id")
+        stat_league_id = stat_league.get("id")
+        stat_season = stat_league.get("season")
+        stat_appearances = ((stat.get("games") or {}).get("appearences")) or 0
+
+        try:
+            stat_appearances = int(stat_appearances)
+        except (ValueError, TypeError):
+            stat_appearances = 0
+
+        candidates.append({
+            "stat": stat,
+            "team_match": stat_team_id == team_id,
+            "league_id": stat_league_id,
+            "season_match": stat_season == season,
+            "is_serie_a": stat_league_id == SERIE_A_LEAGUE_ID,
+            "appearances": stat_appearances,
+        })
+
+    if not candidates:
+        return statistics_list[0] if statistics_list else {}
+
+    # Ordina per: team match > Serie A > stagione > presenze
+    candidates.sort(key=lambda c: (
+        c["team_match"],
+        c["is_serie_a"],
+        c["season_match"],
+        c["appearances"],
+    ), reverse=True)
+
+    best = candidates[0]
+    return best["stat"]
+
+
+def _extract_stats_from_block(stats: dict) -> dict[str, Any]:
+    """Estrae tutti i campi statistici da un singolo blocco statistics entry."""
     games = stats.get("games") or {}
     shots = stats.get("shots") or {}
     goals_data = stats.get("goals") or {}
@@ -130,12 +152,7 @@ def _extract_player_data(item: dict[str, Any]) -> dict[str, Any] | None:
     penalty = stats.get("penalty") or {}
 
     return {
-        "api_player_id": int(api_player_id),
-        "name": name,
-        "age": player_info.get("age"),
-        "nationality": player_info.get("nationality"),
-        "position": games.get("position") or player_info.get("position"),
-
+        "position": games.get("position"),
         "appearances": _safe_int(games.get("appearences")),
         "lineups": _safe_int(games.get("lineups")),
         "minutes": _safe_int(games.get("minutes")),
@@ -179,6 +196,56 @@ def _extract_player_data(item: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _extract_player_data(
+    item: dict[str, Any],
+    team_id: int,
+    season: int,
+) -> dict[str, Any] | None:
+    """
+    Estrae dati anagrafici e statistiche da un elemento della response API-Sports.
+    Seleziona la statistica giusta tra le multi-competizioni usando _pick_best_stat().
+    Ritorna None se mancano dati essenziali.
+    """
+    player_info = item.get("player") or {}
+    api_player_id = player_info.get("id")
+    if not api_player_id:
+        return None
+
+    name = player_info.get("name") or ""
+    if not name:
+        firstname = player_info.get("firstname") or ""
+        lastname = player_info.get("lastname") or ""
+        name = f"{firstname} {lastname}".strip()
+    if not name:
+        return None
+
+    statistics_list = item.get("statistics") or []
+
+    if not statistics_list:
+        return {
+            "api_player_id": int(api_player_id),
+            "name": name,
+            "age": player_info.get("age"),
+            "nationality": player_info.get("nationality"),
+            "position": player_info.get("position"),
+            **{field: None for field in STATS_DB_FIELDS},
+        }
+
+    best_stat = _pick_best_stat(statistics_list, team_id, season)
+    parsed = _extract_stats_from_block(best_stat)
+
+    position = parsed.pop("position", None) or player_info.get("position")
+
+    return {
+        "api_player_id": int(api_player_id),
+        "name": name,
+        "age": player_info.get("age"),
+        "nationality": player_info.get("nationality"),
+        "position": position,
+        **parsed,
+    }
+
+
 def _build_stats_dict(data: dict[str, Any]) -> dict[str, Any]:
     """Estrae dal dict completo solo i campi statistici (per upsert DB)."""
     return {field: data.get(field) for field in STATS_DB_FIELDS}
@@ -190,10 +257,10 @@ async def ingest_team_players(team_id: int, season: int, db: Session) -> int:
 
     Flusso:
     1. Chiama API-Sports GET /players?team={team_id}&season={season} (paginato)
-    2. Per ogni giocatore: upsert in tabella players (anagrafica)
-    3. Upsert in player_season_stats con TUTTE le statistiche
+    2. Per ogni giocatore: seleziona la statistica della competizione giusta
+    3. Upsert in players (anagrafica) e player_season_stats (statistiche complete)
     4. Commit in un'unica transaction
-    5. Se un singolo giocatore fallisce, logga e continua con il prossimo
+    5. Se un singolo giocatore fallisce, logga stacktrace e continua
 
     Ritorna il numero di giocatori processati con successo.
     """
@@ -204,7 +271,6 @@ async def ingest_team_players(team_id: int, season: int, db: Session) -> int:
         team_id, season,
     )
 
-    # --- Chiamata API ---
     try:
         raw_players = await client.get_team_players(team_id=team_id, season=season)
     except Exception:
@@ -226,17 +292,37 @@ async def ingest_team_players(team_id: int, season: int, db: Session) -> int:
         len(raw_players), team_id, season,
     )
 
-    # Log del primo giocatore per debug struttura API
-    if raw_players:
-        first = raw_players[0]
-        first_player_info = (first.get("player") or {})
-        first_stats_list = first.get("statistics") or []
-        first_stat_keys = list(first_stats_list[0].keys()) if first_stats_list and isinstance(first_stats_list[0], dict) else []
+    # --- Debug log del primo giocatore ---
+    first = raw_players[0]
+    first_info = first.get("player") or {}
+    first_stats_list = first.get("statistics") or []
+    logger.info(
+        "DEBUG primo giocatore: id=%s name=%s, num_statistics=%s, leagues=%s",
+        first_info.get("id"),
+        first_info.get("name"),
+        len(first_stats_list),
+        [
+            f"{(s.get('league') or {}).get('name', '?')} (id={((s.get('league') or {}).get('id', '?'))})"
+            for s in first_stats_list
+            if isinstance(s, dict)
+        ],
+    )
+    if first_stats_list:
+        best_first = _pick_best_stat(first_stats_list, team_id, season)
+        parsed_first = _extract_stats_from_block(best_first)
+        selected_league = (best_first.get("league") or {}).get("name", "?")
         logger.info(
-            "DEBUG primo giocatore: id=%s name=%s, statistics[0] keys=%s",
-            first_player_info.get("id"),
-            first_player_info.get("name"),
-            first_stat_keys,
+            "DEBUG primo giocatore stat selezionata: league=%s, "
+            "yellow=%s, fouls_committed=%s, tackles_total=%s, "
+            "appearances=%s, minutes=%s, goals=%s, rating=%s",
+            selected_league,
+            parsed_first.get("yellow_cards"),
+            parsed_first.get("fouls_committed"),
+            parsed_first.get("tackles_total"),
+            parsed_first.get("appearances"),
+            parsed_first.get("minutes"),
+            parsed_first.get("goals"),
+            parsed_first.get("rating"),
         )
 
     processed = 0
@@ -245,7 +331,7 @@ async def ingest_team_players(team_id: int, season: int, db: Session) -> int:
 
     for idx, item in enumerate(raw_players):
         try:
-            data = _extract_player_data(item)
+            data = _extract_player_data(item, team_id=team_id, season=season)
             if not data:
                 skipped += 1
                 continue

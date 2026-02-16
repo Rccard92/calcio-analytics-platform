@@ -13,10 +13,15 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.models import Fixture, Team, TeamMatchStats
 from app.services.api_sports_client import ApiSportsClient
+from app.services.player_ingestion_service import (
+    _extract_player_data,
+    _extract_stats_from_block,
+    _pick_best_stat,
+)
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/debug", tags=["Debug"])
+router = APIRouter(prefix="/api/debug", tags=["Debug"])
 
 
 @router.get("/raw-stats/{fixture_id}")
@@ -135,11 +140,16 @@ def sample_fixture(db: Session = Depends(get_db)):
 
 
 @router.get("/player/{api_player_id}/season/{season}")
-async def player_debug(api_player_id: int, season: int):
+async def player_debug(api_player_id: int, season: int, team_id: int | None = None):
     """
     Ritorna la response completa di API-Football per un singolo giocatore e stagione.
     Chiama /players?id={api_player_id}&season={season}.
     Non salva nulla nel DB — solo lettura da API esterna.
+
+    Mostra anche:
+    - Tutte le competizioni presenti in statistics[]
+    - La statistica selezionata dall'algoritmo di ingestion
+    - I valori parsati che verrebbero salvati nel DB
     """
     client = ApiSportsClient()
     try:
@@ -157,7 +167,7 @@ async def player_debug(api_player_id: int, season: int):
 
     if not result:
         return {
-            "error": "No data found",
+            "error": "Nessun dato trovato",
             "player_id": api_player_id,
             "season": season,
         }
@@ -165,12 +175,41 @@ async def player_debug(api_player_id: int, season: int):
     player_info = result.get("player", {})
     statistics = result.get("statistics", [])
 
+    # Mostra le competizioni disponibili
+    leagues_available = []
+    for idx, stat in enumerate(statistics):
+        if not isinstance(stat, dict):
+            continue
+        league = stat.get("league") or {}
+        team = stat.get("team") or {}
+        games = stat.get("games") or {}
+        leagues_available.append({
+            "index": idx,
+            "league_id": league.get("id"),
+            "league_name": league.get("name"),
+            "league_season": league.get("season"),
+            "team_id": team.get("id"),
+            "team_name": team.get("name"),
+            "appearances": games.get("appearences"),
+            "minutes": games.get("minutes"),
+        })
+
+    # Simula la selezione che farebbe l'ingestion
+    effective_team_id = team_id or 0
+    selected_stat = _pick_best_stat(statistics, effective_team_id, season)
+    parsed_stats = _extract_stats_from_block(selected_stat) if selected_stat else {}
+    selected_league_name = (selected_stat.get("league") or {}).get("name", "N/A") if selected_stat else "N/A"
+
     return {
         "player_id": api_player_id,
         "season": season,
         "player": player_info,
-        "statistics": statistics,
         "statistics_count": len(statistics),
+        "leagues_available": leagues_available,
+        "selected_league": selected_league_name,
+        "selected_stat_raw": selected_stat,
+        "parsed_stats_for_db": parsed_stats,
+        "statistics_full": statistics,
     }
 
 
