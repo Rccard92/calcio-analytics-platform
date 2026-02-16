@@ -1,13 +1,17 @@
 """
 Servizio rosa giocatori per squadra e stagione.
 Query unica: join players + player_season_stats filtrato per team_id e season.
+Compatibile con schema vecchio (shots, shots_on_target) e nuovo (shots_total, shots_on).
 """
+
+import logging
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.schemas.teams import PlayerSeasonRow
 
+logger = logging.getLogger(__name__)
 
 TEAM_PLAYERS_SQL = text("""
 SELECT
@@ -29,10 +33,29 @@ WHERE s.team_id = :team_id AND s.season = :season
 ORDER BY p.name
 """)
 
+TEAM_PLAYERS_SQL_LEGACY = text("""
+SELECT
+  p.id AS player_id,
+  p.name AS name,
+  COALESCE(p.position, '') AS position,
+  COALESCE(s.appearances, 0)::INT AS appearances,
+  COALESCE(s.minutes, 0)::INT AS minutes,
+  COALESCE(s.goals, 0)::INT AS goals,
+  COALESCE(s.assists, 0)::INT AS assists,
+  COALESCE(s.shots, 0)::INT AS shots,
+  ROUND(COALESCE(s.passes_accuracy, 0)::NUMERIC, 2)::FLOAT AS pass_accuracy,
+  ROUND(COALESCE(s.rating, 0)::NUMERIC, 2)::FLOAT AS rating,
+  0 AS yellow_cards,
+  0 AS red_cards
+FROM players p
+INNER JOIN player_season_stats s ON s.player_id = p.id
+WHERE s.team_id = :team_id AND s.season = :season
+ORDER BY p.name
+""")
 
-def get_team_players(team_id: int, season: int, db: Session) -> list[PlayerSeasonRow]:
-    """Rosa giocatori con statistiche stagionali per team_id e season."""
-    rows = db.execute(TEAM_PLAYERS_SQL, {"team_id": team_id, "season": season}).mappings().all()
+
+def _rows_to_list(rows: list) -> list[PlayerSeasonRow]:
+    """Converte le righe SQL in lista di PlayerSeasonRow."""
     return [
         PlayerSeasonRow(
             player_id=r["player_id"],
@@ -50,3 +73,33 @@ def get_team_players(team_id: int, season: int, db: Session) -> list[PlayerSeaso
         )
         for r in rows
     ]
+
+
+def get_team_players(team_id: int, season: int, db: Session) -> list[PlayerSeasonRow]:
+    """
+    Rosa giocatori con statistiche stagionali per team_id e season.
+    Tenta la query con lo schema nuovo; se fallisce (colonne mancanti)
+    usa automaticamente la query legacy. Non crasha mai.
+    """
+    params = {"team_id": team_id, "season": season}
+
+    try:
+        rows = db.execute(TEAM_PLAYERS_SQL, params).mappings().all()
+        return _rows_to_list(rows)
+    except Exception as e:
+        logger.warning(
+            "Query players (schema nuovo) fallita per team_id=%s season=%s: %s. Provo legacy.",
+            team_id, season, e,
+        )
+        db.rollback()
+
+    try:
+        rows = db.execute(TEAM_PLAYERS_SQL_LEGACY, params).mappings().all()
+        return _rows_to_list(rows)
+    except Exception as e:
+        logger.exception(
+            "Anche query legacy fallita per team_id=%s season=%s: %s",
+            team_id, season, e,
+        )
+        db.rollback()
+        return []
