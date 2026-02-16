@@ -134,6 +134,46 @@ def sample_fixture(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/player/{api_player_id}/season/{season}")
+async def player_debug(api_player_id: int, season: int):
+    """
+    Ritorna la response completa di API-Football per un singolo giocatore e stagione.
+    Chiama /players?id={api_player_id}&season={season}.
+    Non salva nulla nel DB — solo lettura da API esterna.
+    """
+    client = ApiSportsClient()
+    try:
+        result = await client.get_player_by_id(player_id=api_player_id, season=season)
+    except Exception as e:
+        logger.exception(
+            "Errore API-Sports debug player api_player_id=%s season=%s: %s",
+            api_player_id, season, e,
+        )
+        return {
+            "error": f"Errore chiamata API-Sports: {type(e).__name__}: {e}",
+            "player_id": api_player_id,
+            "season": season,
+        }
+
+    if not result:
+        return {
+            "error": "No data found",
+            "player_id": api_player_id,
+            "season": season,
+        }
+
+    player_info = result.get("player", {})
+    statistics = result.get("statistics", [])
+
+    return {
+        "player_id": api_player_id,
+        "season": season,
+        "player": player_info,
+        "statistics": statistics,
+        "statistics_count": len(statistics),
+    }
+
+
 @router.get("/team/{team_id}/season/{season}/api-raw")
 async def api_raw_players(team_id: int, season: int):
     """

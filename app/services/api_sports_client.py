@@ -156,6 +156,35 @@ class ApiSportsClient:
         )
         return all_players
 
+    async def get_player_by_id(self, player_id: int, season: int) -> dict[str, Any] | None:
+        """
+        Ritorna la response completa di API-Sports per un singolo giocatore e stagione.
+        Chiama GET /players?id={player_id}&season={season}.
+        Logga header rate limit. Ritorna None se non trovato.
+        """
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.get(
+                f"{BASE_URL}/players",
+                params={"id": player_id, "season": season},
+                headers=self._headers(),
+            )
+            r.raise_for_status()
+
+            remaining = _get_header(r.headers, "x-ratelimit-remaining", "x-ratelimit-remaining-minute")
+            logger.info(
+                "get_player_by_id player=%s season=%s — rate limit remaining: %s",
+                player_id, season, remaining,
+            )
+
+            data = r.json()
+            errors = data.get("errors", {})
+            if errors:
+                logger.warning("API-Sports errors (player by id): %s", errors)
+                return None
+
+            response = data.get("response", [])
+            return response[0] if response else None
+
     async def test_connection(self) -> dict[str, Any]:
         """
         Test connessione leggero: chiama /status (non consuma quota giornaliera).
