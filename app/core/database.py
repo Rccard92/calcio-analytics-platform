@@ -120,6 +120,8 @@ def init_db() -> None:
     """
     from app.models import (  # noqa: F401
         fixture,
+        fixture_event,
+        fixture_lineup,
         ingestion_job,
         league,
         player,

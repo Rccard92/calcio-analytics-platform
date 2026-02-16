@@ -111,6 +111,7 @@ class PlayerSeasonRow(BaseModel):
     defense_score: float | None = None
     impact_score: float | None = None
     discipline_malus: float | None = None
+    reliability_index: float | None = None  # min(1, minutes/1200) * 100
 
     # Breakdown per metrica (opzionale, attivato con ?breakdown=true)
     breakdown: dict[str, Any] | None = None

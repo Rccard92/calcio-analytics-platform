@@ -156,6 +156,46 @@ class ApiSportsClient:
         )
         return all_players
 
+    async def get_fixture_lineups(self, fixture_id: int) -> list[dict[str, Any]]:
+        """
+        Ritorna le formazioni per la fixture.
+        Ogni entry ha 'team', 'formation', 'startXI', 'substitutes'.
+        """
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.get(
+                f"{BASE_URL}/fixtures/lineups",
+                params={"fixture": fixture_id},
+                headers=self._headers(),
+            )
+            r.raise_for_status()
+            remaining = _get_header(r.headers, "x-ratelimit-remaining", "x-ratelimit-remaining-minute")
+            logger.debug(
+                "get_fixture_lineups fixture=%s — rate limit remaining: %s",
+                fixture_id, remaining,
+            )
+            data = r.json()
+        return data.get("response", [])
+
+    async def get_fixture_events(self, fixture_id: int) -> list[dict[str, Any]]:
+        """
+        Ritorna gli eventi per la fixture (gol, cartellini, sostituzioni, VAR).
+        Ogni entry ha 'time', 'team', 'player', 'assist', 'type', 'detail'.
+        """
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.get(
+                f"{BASE_URL}/fixtures/events",
+                params={"fixture": fixture_id},
+                headers=self._headers(),
+            )
+            r.raise_for_status()
+            remaining = _get_header(r.headers, "x-ratelimit-remaining", "x-ratelimit-remaining-minute")
+            logger.debug(
+                "get_fixture_events fixture=%s — rate limit remaining: %s",
+                fixture_id, remaining,
+            )
+            data = r.json()
+        return data.get("response", [])
+
     async def get_player_by_id(self, player_id: int, season: int) -> dict[str, Any] | None:
         """
         Ritorna la response completa di API-Sports per un singolo giocatore e stagione.

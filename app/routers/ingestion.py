@@ -1,6 +1,7 @@
 """
 Router per avvio e stato dei job di ingestion.
 La logica è nel service; il server non si blocca (background task).
+Include ingestion lineups e events per Serie A.
 """
 
 import logging
@@ -9,6 +10,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.ingestion.events_service import ingest_events_for_season
+from app.ingestion.lineups_service import ingest_lineups_for_season
 from app.models import IngestionJob
 from app.services.api_sports_client import ApiSportsClient
 from app.services.ingestion_service import IngestionService
@@ -130,3 +133,50 @@ def ingestion_status(job_id: int, db: Session = Depends(get_db)):
         "progress_percentage": progress,
         "error_message": job.error_message,
     }
+
+
+# -----------------------------------------------------------------------
+# Ingestion lineups e events per Serie A
+# -----------------------------------------------------------------------
+
+
+@router.post("/lineups/{season}")
+async def ingest_lineups(
+    season: int,
+    batch_size: int = 50,
+    db: Session = Depends(get_db),
+):
+    """
+    Scarica formazioni per tutte le fixture FT della stagione.
+    Incrementale: salta fixture gia' processate.
+    batch_size: numero massimo di fixture per chiamata (0 = tutte).
+    """
+    try:
+        result = await ingest_lineups_for_season(
+            season=season, db=db, batch_size=batch_size,
+        )
+        return {"season": season, **result}
+    except Exception as e:
+        logger.exception("Errore ingestion lineups season=%s: %s", season, e)
+        raise HTTPException(status_code=500, detail=f"Errore ingestion lineups: {e}")
+
+
+@router.post("/events/{season}")
+async def ingest_events(
+    season: int,
+    batch_size: int = 50,
+    db: Session = Depends(get_db),
+):
+    """
+    Scarica eventi per tutte le fixture FT della stagione.
+    Incrementale: salta fixture gia' processate.
+    batch_size: numero massimo di fixture per chiamata (0 = tutte).
+    """
+    try:
+        result = await ingest_events_for_season(
+            season=season, db=db, batch_size=batch_size,
+        )
+        return {"season": season, **result}
+    except Exception as e:
+        logger.exception("Errore ingestion events season=%s: %s", season, e)
+        raise HTTPException(status_code=500, detail=f"Errore ingestion events: {e}")

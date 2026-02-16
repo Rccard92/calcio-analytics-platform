@@ -1,7 +1,9 @@
 """
 Servizio rosa giocatori per squadra e stagione.
-Query join players + player_season_stats, arricchita con metriche derivate
-e scoring FIFA-style normalizzato per ruolo (percentile empirico + Tier A/B/C).
+Usa analytics/league_distribution per le distribuzioni per ruolo
+e analytics/attribution_engine per lo scoring FIFA-style.
+
+Nessuna metrica calcolata qui — tutto delegato al layer analytics.
 """
 
 import logging
@@ -10,13 +12,13 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.schemas.teams import PlayerSeasonRow
-from app.services.player_metrics import (
+from app.analytics.attribution_engine import calculate_player_score
+from app.analytics.league_distribution import (
     RoleDistributions,
     build_role_distributions,
-    calculate_all_metrics,
-    calculate_player_score,
+    compute_player_metrics,
 )
+from app.schemas.teams import PlayerSeasonRow
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,8 @@ SELECT
   s.captain,
   s.blocks,
   s.saves,
-  s.goals_conceded
+  s.goals_conceded,
+  s.penalty_saved
 FROM players p
 INNER JOIN player_season_stats s ON s.player_id = p.id
 WHERE s.team_id = :team_id AND s.season = :season
@@ -84,42 +87,11 @@ SELECT
   false AS captain,
   0 AS blocks,
   0 AS saves,
-  0 AS goals_conceded
+  0 AS goals_conceded,
+  0 AS penalty_saved
 FROM players p
 INNER JOIN player_season_stats s ON s.player_id = p.id
 WHERE s.team_id = :team_id AND s.season = :season
-""")
-
-ROLE_DISTRIBUTION_SQL = text("""
-SELECT
-  COALESCE(p.position, '') AS position,
-  s.appearances,
-  s.minutes,
-  s.goals,
-  s.assists,
-  s.shots_total,
-  s.shots_on,
-  s.passes_accuracy,
-  s.rating,
-  s.yellow_cards,
-  s.red_cards,
-  s.tackles_total,
-  s.interceptions,
-  s.duels_total,
-  s.duels_won,
-  s.dribbles_attempts,
-  s.dribbles_success,
-  s.key_passes,
-  s.fouls_committed,
-  s.captain,
-  s.blocks,
-  s.saves,
-  s.goals_conceded
-FROM player_season_stats s
-INNER JOIN players p ON p.id = s.player_id
-WHERE s.season = :season
-  AND s.minutes IS NOT NULL
-  AND s.minutes >= 300
 """)
 
 
@@ -146,9 +118,10 @@ def _nullable_float(val: Any) -> float | None:
 
 
 def _row_to_stats_dict(row: dict[str, Any]) -> dict[str, Any]:
-    """Converte una riga DB in dict di stats per il motore di scoring."""
+    """Converte una riga DB in dict di stats per il layer analytics."""
     return {
         "position": row.get("position") or "",
+        "api_player_id": row.get("api_player_id"),
         "minutes": row.get("minutes"),
         "appearances": row.get("appearances"),
         "goals": row.get("goals"),
@@ -171,40 +144,8 @@ def _row_to_stats_dict(row: dict[str, Any]) -> dict[str, Any]:
         "captain": bool(row.get("captain")),
         "pass_accuracy": _nullable_float(row.get("passes_accuracy")),
         "rating": _nullable_float(row.get("rating")),
+        "penalty_saved": row.get("penalty_saved"),
     }
-
-
-# ---------------------------------------------------------------------------
-# Role distributions
-# ---------------------------------------------------------------------------
-
-def _compute_role_distributions(season: int, db: Session) -> RoleDistributions:
-    """
-    Calcola distribuzioni empiriche per ruolo su TUTTI i giocatori della
-    stagione con >= 300 minuti. Usata come baseline per i percentili.
-    """
-    try:
-        rows = db.execute(ROLE_DISTRIBUTION_SQL, {"season": season}).mappings().all()
-    except Exception as e:
-        logger.warning(
-            "Query distribuzione ruoli fallita per season=%s: %s. Score saranno None.",
-            season, e,
-        )
-        try:
-            db.rollback()
-        except Exception:
-            pass
-        return {}
-
-    all_stats = [_row_to_stats_dict(dict(r)) for r in rows]
-    dists = build_role_distributions(all_stats)
-
-    logger.info(
-        "Distribuzione per ruolo season=%s: %d giocatori qualificati totali, %d ruoli",
-        season, len(all_stats), len(dists),
-    )
-
-    return dists
 
 
 # ---------------------------------------------------------------------------
@@ -214,19 +155,26 @@ def _compute_role_distributions(season: int, db: Session) -> RoleDistributions:
 def _enrich_row(
     row: dict[str, Any],
     role_dists: RoleDistributions,
+    player_cache: dict[int, dict[str, Any]],
     include_breakdown: bool = False,
 ) -> PlayerSeasonRow:
     """
-    Arricchisce una riga DB con metriche derivate (per-90, percentuali)
-    e punteggi FIFA-style normalizzati per ruolo.
+    Arricchisce una riga DB con metriche derivate e scoring.
+    Usa il player_cache se disponibile, altrimenti calcola da zero.
     """
     raw = _row_to_stats_dict(row)
-    derived = calculate_all_metrics(raw)
-    scores = calculate_player_score(raw, role_dists)
+    api_pid = raw.get("api_player_id") or 0
+
+    if api_pid and api_pid in player_cache:
+        derived = player_cache[api_pid]
+    else:
+        derived = compute_player_metrics(raw)
+
+    scores = calculate_player_score(derived, role_dists, raw.get("position"))
 
     return PlayerSeasonRow(
         player_id=row["player_id"],
-        api_player_id=row.get("api_player_id") or 0,
+        api_player_id=api_pid,
         name=row.get("name") or "",
         position=raw["position"],
         appearances=_safe_int(row.get("appearances")),
@@ -242,6 +190,7 @@ def _enrich_row(
         tackles_total=_safe_int(row.get("tackles_total")),
         interceptions=_safe_int(row.get("interceptions")),
         key_passes=_safe_int(row.get("key_passes")),
+        # Metriche derivate per tabella
         goals_per_90=derived.get("goals_per_90"),
         assists_per_90=derived.get("assists_per_90"),
         shots_per_90=derived.get("shots_per_90"),
@@ -249,12 +198,14 @@ def _enrich_row(
         shot_accuracy_pct=derived.get("shot_accuracy_pct"),
         duels_won_pct=derived.get("duels_won_pct"),
         dribbles_success_pct=derived.get("dribbles_success_pct"),
+        # Scoring
         overall_score=scores.get("overall_score"),
         attack_score=scores.get("attack_score"),
         creation_score=scores.get("creation_score"),
         defense_score=scores.get("defense_score"),
         impact_score=scores.get("impact_score"),
         discipline_malus=scores.get("discipline_malus"),
+        reliability_index=scores.get("reliability_index"),
         breakdown=scores.get("breakdown") if include_breakdown else None,
     )
 
@@ -262,10 +213,14 @@ def _enrich_row(
 def _rows_to_list(
     rows: list,
     role_dists: RoleDistributions,
+    player_cache: dict[int, dict[str, Any]],
     include_breakdown: bool = False,
 ) -> list[PlayerSeasonRow]:
     """Converte righe SQL in lista arricchita, ordinata per overall_score DESC."""
-    result = [_enrich_row(dict(r), role_dists, include_breakdown) for r in rows]
+    result = [
+        _enrich_row(dict(r), role_dists, player_cache, include_breakdown)
+        for r in rows
+    ]
     result.sort(
         key=lambda p: (p.overall_score is not None, p.overall_score or 0),
         reverse=True,
@@ -284,36 +239,36 @@ def get_team_players(
     include_breakdown: bool = False,
 ) -> list[PlayerSeasonRow]:
     """
-    Rosa giocatori con statistiche stagionali, metriche derivate e scoring
-    FIFA-style normalizzato per ruolo.
+    Rosa giocatori con statistiche stagionali e scoring FIFA-style
+    normalizzato per ruolo.
 
     Flusso:
-      1. Calcola distribuzioni empiriche per ruolo (tutti i giocatori della stagione)
-      2. Carica i giocatori della squadra richiesta
-      3. Per ogni giocatore: percentile per ruolo -> shrinkage -> Tier A/B/C -> malus
+      1. Costruisce distribuzioni empiriche per ruolo (tutti i giocatori della lega)
+      2. Carica giocatori della squadra
+      3. Per ogni giocatore: percentile per ruolo -> shrinkage -> Tier -> malus
       4. Ordina per overall_score DESC
 
-    Tenta lo schema nuovo; fallback su legacy se colonne mancanti.
+    Tenta schema nuovo, fallback su legacy se colonne mancanti.
     """
-    role_dists = _compute_role_distributions(season, db)
+    role_dists, player_cache = build_role_distributions(season, db)
     params = {"team_id": team_id, "season": season}
 
     try:
         rows = db.execute(TEAM_PLAYERS_SQL, params).mappings().all()
-        return _rows_to_list(rows, role_dists, include_breakdown)
+        return _rows_to_list(rows, role_dists, player_cache, include_breakdown)
     except Exception as e:
         logger.warning(
-            "Query players (schema nuovo) fallita per team_id=%s season=%s: %s. Provo legacy.",
+            "Query players (schema nuovo) fallita team_id=%s season=%s: %s. Provo legacy.",
             team_id, season, e,
         )
         db.rollback()
 
     try:
         rows = db.execute(TEAM_PLAYERS_SQL_LEGACY, params).mappings().all()
-        return _rows_to_list(rows, role_dists, include_breakdown)
+        return _rows_to_list(rows, role_dists, player_cache, include_breakdown)
     except Exception as e:
         logger.exception(
-            "Anche query legacy fallita per team_id=%s season=%s: %s",
+            "Anche query legacy fallita team_id=%s season=%s: %s",
             team_id, season, e,
         )
         db.rollback()
