@@ -1,6 +1,7 @@
 """Pydantic schemas per API Teams."""
 
 from pydantic import BaseModel
+from typing import Any
 
 
 # --- Team Detail (Step 2) ---
@@ -73,7 +74,7 @@ class TeamSeasonOverviewResponse(BaseModel):
 
 
 class PlayerSeasonRow(BaseModel):
-    """Riga rosa: giocatore con statistiche stagionali, metriche derivate e scoring."""
+    """Riga rosa: giocatore con statistiche stagionali, metriche derivate e scoring FIFA-style."""
     player_id: int
     api_player_id: int = 0
     name: str
@@ -103,12 +104,16 @@ class PlayerSeasonRow(BaseModel):
     duels_won_pct: float | None = None
     dribbles_success_pct: float | None = None
 
-    # Punteggi compositi (calcolati nel service layer, normalizzati league-wide)
+    # Punteggi compositi — FIFA-style, normalizzati per ruolo con Tier A/B/C
     overall_score: float | None = None
-    offensive_score: float | None = None
-    defensive_score: float | None = None
-    playmaking_score: float | None = None
-    discipline_score: float | None = None
+    attack_score: float | None = None
+    creation_score: float | None = None
+    defense_score: float | None = None
+    impact_score: float | None = None
+    discipline_malus: float | None = None
+
+    # Breakdown per metrica (opzionale, attivato con ?breakdown=true)
+    breakdown: dict[str, Any] | None = None
 
     class Config:
         from_attributes = True

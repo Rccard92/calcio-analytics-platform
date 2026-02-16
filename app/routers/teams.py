@@ -51,14 +51,26 @@ def team_detail(team_id: int, season: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{team_id}/season/{season}/players", response_model=list[PlayerSeasonRow])
-def team_players(team_id: int, season: int, db: Session = Depends(get_db)):
+def team_players(
+    team_id: int,
+    season: int,
+    breakdown: bool = False,
+    db: Session = Depends(get_db),
+):
     """
     Rosa giocatori con statistiche stagionali per squadra e stagione.
-    Query unica join players + player_season_stats.
+    Query join players + player_season_stats, arricchita con scoring FIFA-style.
+
+    Parametri opzionali:
+      - breakdown=true: include il dettaglio per metrica (percentile, score, peso)
+
     Se non ci sono dati restituisce array vuoto (mai errore).
     """
     try:
-        return get_team_players(team_id=team_id, season=season, db=db)
+        return get_team_players(
+            team_id=team_id, season=season, db=db,
+            include_breakdown=breakdown,
+        )
     except Exception as e:
         logger.exception("Errore GET players team_id=%s season=%s: %s", team_id, season, e)
         return []
